@@ -3,5 +3,7 @@ Regional coordination tool for operational data based on OperatorFabric open sou
 
 ---
 Architectural diagram for the Operator Fabric platform
-![Architecture diagram](./opfab-architecture.svg)
+<a href="./opfab-architecture.svg" target="_blank" rel="noopener noreferrer">
+  <img src="./opfab-architecture.svg" alt="Architecture diagram">
+</a>
 ---
