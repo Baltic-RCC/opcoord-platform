@@ -1,0 +1,35 @@
+{
+	"id":"csaLocal",
+	"name": "BRCC CSA process",
+	"version":"6",
+	"uiVisibility": {
+		"monitoring": true,
+		"logging": true,
+		"calendar": true
+	},
+	"states":{
+		"proposed" : {
+			"name": "Proposed RA",
+			"templateName" : "template",
+			"color": "#8bcdcd",
+			"styles" : [ "style" ],
+			"acknowledgmentAllowed": "Always",
+			"automaticPinWhenAcknowledged" : true,
+			"showAcknowledgmentFooter" : "ForAllUsers",
+			"showDetailCardHeader": true
+		},
+		"violations" : {
+			"name": "Violations",
+			"templateName" : "violations",
+			"color": "#8bcdcd",
+			"styles" : [ "style" ],
+			"acknowledgmentAllowed": "Always",
+			"showAcknowledgmentFooter" : "ForAllUsers"
+		},
+		"messageState2" : {
+			"templateName" : "template",
+			"styles" : [ "style" ],
+			"acknowledgmentAllowed": "Always"
+		}
+	}
+}

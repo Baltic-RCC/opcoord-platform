@@ -1,0 +1,10 @@
+{
+	"process": {
+		"name": "Default BRCC CSA process"
+	},
+	"csaLocal":{
+		"title":"RCC CSA",
+		"summary":"Message received from BRCC"
+	}
+}
+

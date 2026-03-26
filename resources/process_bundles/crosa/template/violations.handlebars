@@ -1,0 +1,96 @@
+<div class="cq">
+  <div class="cq-section">
+    <div class="cq-section-title">Power flow results</div>
+
+    <div class="cq-table-wrap">
+      <table class="cq-table">
+        <thead>
+          <tr>
+            <th style="width: 180px;">ACDCTerminal</th>
+            <th>Equipment</th>
+            <th>Substation</th>
+            <th>Region</th>
+
+            <th style="width: 150px;">BC value</th>
+            <th style="width: 150px;">BC loading</th>
+            <th style="width: 150px;">CO value</th>
+            <th style="width: 150px;">CO loading</th>
+
+            <th style="width: 140px;">Limit</th>
+            <th style="width: 220px;">Contingency</th>
+            <th style="width: 110px;">BC violation</th>
+            <th style="width: 110px;">CO violation</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {{#if card.data.ContingencyPowerFlowResult}}
+            {{#each card.data.ContingencyPowerFlowResult}}
+              <tr class="{{#if isViolation}}cq-row-violation{{/if}}">
+                <td class="cq-mono">{{ACDCTerminal}}</td>
+                <td>{{EquipmentName}}</td>
+                <td>{{Substation}}</td>
+                <td>{{ReportedByRegion}}</td>
+
+                {{!-- BC value: matched by ACDCTerminal (prints nothing if no match) --}}
+                <td class="cq-empty">
+                  {{#each ../card.data.BaseCasePowerFlowResult}}
+                    {{#if (bool ACDCTerminal '===' ../ACDCTerminal)}}
+                      {{#if (bool value '>' 100)}}
+                        <span class="cq-pill cq-pill-bad">{{numberFormat value maximumFractionDigits=2}}%</span>
+                      {{else}}
+                        <span class="cq-pill">{{numberFormat value maximumFractionDigits=2}}%</span>
+                      {{/if}}
+                    {{/if}}
+                  {{/each}}
+                </td>
+
+                {{!-- BC loading: matched by ACDCTerminal (prints nothing if no match) --}}
+                <td class="cq-empty">{{#each ../card.data.BaseCasePowerFlowResult}}{{#if (bool ACDCTerminal '===' ../ACDCTerminal)}}<span class="cq-pill">{{numberFormat value maximumFractionDigits=2}}%</span>{{/if}}{{/each}}</td>
+
+                {{!-- Contingency value --}}
+                <td><span class="cq-pill">{{numberFormat valueA maximumFractionDigits=2}}</span></td>
+
+                {{!-- Contingency percent --}}
+                <td>
+                  {{#if (bool value '>' 100)}}
+                    <span class="cq-pill cq-pill-bad">{{numberFormat value maximumFractionDigits=2}}%</span>
+                  {{else}}
+                    <span class="cq-pill">{{numberFormat value maximumFractionDigits=2}}%</span>
+                  {{/if}}
+                </td>
+
+                <td class="cq-mono">{{numberFormat OperationalLimitValue maximumFractionDigits=2}}</td>
+                <td class="cq-mono">{{Contingency}}</td>
+                <td class="cq-empty">
+                  {{#each ../card.data.BaseCasePowerFlowResult}}
+                    {{#if (bool ACDCTerminal '===' ../ACDCTerminal)}}
+                      {{#if this.isViolation}}
+                        <span class="cq-pill cq-pill-bad">true</span>
+                      {{else}}
+                        <span class="cq-pill">false</span>
+                      {{/if}}
+                    {{/if}}
+                  {{/each}}
+                </td>
+
+                {{!-- Contingency violation (current row) --}}
+                <td>
+                  {{#if isViolation}}
+                    <span class="cq-pill cq-pill-bad">true</span>
+                  {{else}}
+                    <span class="cq-pill">false</span>
+                  {{/if}}
+                </td>
+              </tr>
+            {{/each}}
+          {{else}}
+            <tr>
+              <td colspan="8" class="cq-muted">No contingency results</td>
+            </tr>
+          {{/if}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
