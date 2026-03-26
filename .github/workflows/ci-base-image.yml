@@ -2,18 +2,26 @@ name: CI - Build base image
 
 on:
   push:
-    branches:
-      - main
-    paths:
-      - Dockerfile
-      - uv.lock
+    tags:
+      - "base-v*"
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag for the release (e.g., base-v1.0.0)'
+        required: true
 
 jobs:
   build-base:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Extract Docker tag from Git tag
+        id: vars
+        run: |
+          VERSION="${GITHUB_REF_NAME#base-v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "image=${{ vars.DOCKER_USERNAME }}/opcoord-base" >> "$GITHUB_OUTPUT"
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
@@ -28,7 +36,8 @@ jobs:
           file: Dockerfile
           push: true
           tags: |
-            ${{ vars.DOCKER_USERNAME }}/opcoord-base:latest
+            $${{ steps.vars.outputs.image }}:latest
+            ${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.version }}
 
       - name: Display Success Message
         run: echo "'opcoord-base' image has been built and pushed manually."
