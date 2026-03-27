@@ -1,10 +1,10 @@
 {
 	"process": {
-		"name": "Default BRCC CSA process"
+		"name": "RCC CSA CROSA process"
 	},
-	"csaLocal":{
+	"crosa":{
 		"title":"RCC CSA",
-		"summary":"Message received from BRCC"
+		"summary":"Message received from RCC"
 	}
 }
 
