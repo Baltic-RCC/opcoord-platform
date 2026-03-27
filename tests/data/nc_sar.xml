@@ -1,0 +1,39 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<rdf:RDF xmlns:nc="https://cim4.eu/ns/nc#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:md="http://iec.ch/TC57/61970-552/ModelDescription/1#" xmlns:dcterms="http://purl.org/dc/terms/#" xmlns:brcc="https://baltic-rcc.eu/ns/brcc-nc#" xmlns:dcat="http://www.w3.org/ns/dcat#" xmlns:eumd="https://cim4.eu/ns/Metadata-European#">
+  <md:FullModel rdf:about="urn:uuid:54207fbb-cde5-4f58-8b7b-ac1bd5f3ea4d">
+    <dcterms:identifier>urn:uuid:54207fbb-cde5-4f58-8b7b-ac1bd5f3ea4d</dcterms:identifier>
+    <md:Model.description>Instance of SecurityAnalysisResult profile</md:Model.description>
+    <dcterms:title>2025-03-23T10:59:26Z_SAR_d0fa8598</dcterms:title>
+    <dcterms:conformsTo rdf:resource="https://ap.cim4.eu/SecurityAnalysisResult/2.3"/>
+    <dcterms:accessRights rdf:resource="https://energy.referencedata.eu/Confidentiality/Confidential"/>
+    <eumd:Model.applicationSoftware>BALTIC RCC CUSTOM</eumd:Model.applicationSoftware>
+    <md:Model.created>2025-03-23T10:59:26Z</md:Model.created>
+    <md:Model.version>1</md:Model.version>
+    <dcat:startDate>2023-06-20T22:30:00Z</dcat:startDate>
+    <dcat:endDate>2023-06-21T21:30:00Z</dcat:endDate>
+    <dcat:keyword>SAR</dcat:keyword>
+  </md:FullModel>
+  <nc:BaseCasePowerFlowResult rdf:ID="_cdaa4740-aa20-4b4c-9e7a-417d2240be0d">
+    <nc:PowerFlowResult.atTime>2023-11-30T12:30:00Z</nc:PowerFlowResult.atTime>
+    <nc:PowerFlowResult.isViolation>false</nc:PowerFlowResult.isViolation>
+    <nc:PowerFlowResult.value>98.0</nc:PowerFlowResult.value>
+    <nc:PowerFlowResult.valueA>980.0</nc:PowerFlowResult.valueA>
+    <nc:PowerFlowResult.ACDCTerminal rdf:resource="#_6804e0ba-ba01-55ce-8a8c-84f6fba20c79"/>
+    <nc:PowerFlowResult.ReportedByRegion rdf:resource="https://energy.referencedata.eu/EIC/10YLT-1001A0008Q"/>
+    <brcc:PowerFlowResult.OperationalLimitValue>1000.0</brcc:PowerFlowResult.OperationalLimitValue>
+    <brcc:PowerFlowResult.EquipmentName>BELGOVIA_T1</brcc:PowerFlowResult.EquipmentName>
+    <brcc:PowerFlowResult.Substation>BELGOVIA</brcc:PowerFlowResult.Substation>
+  </nc:BaseCasePowerFlowResult>
+  <nc:ContingencyPowerFlowResult rdf:ID="_6e90eacd-1f30-4fd6-9b3a-528d73f36bc6">
+    <nc:PowerFlowResult.atTime>2023-11-30T12:30:00Z</nc:PowerFlowResult.atTime>
+    <nc:PowerFlowResult.isViolation>true</nc:PowerFlowResult.isViolation>
+    <nc:PowerFlowResult.value>115.0</nc:PowerFlowResult.value>
+    <nc:PowerFlowResult.valueA>1150.0</nc:PowerFlowResult.valueA>
+    <nc:PowerFlowResult.ACDCTerminal rdf:resource="#_6804e0ba-ba01-55ce-8a8c-84f6fba20c79"/>
+    <nc:PowerFlowResult.ReportedByRegion rdf:resource="https://energy.referencedata.eu/EIC/10YLT-1001A0008Q"/>
+    <brcc:PowerFlowResult.OperationalLimitValue>1000.0</brcc:PowerFlowResult.OperationalLimitValue>
+    <brcc:PowerFlowResult.EquipmentName>BELGOVIA_T1</brcc:PowerFlowResult.EquipmentName>
+    <brcc:PowerFlowResult.Substation>BELGOVIA</brcc:PowerFlowResult.Substation>
+    <nc:ContingencyPowerFlowResult.Contingency rdf:resource="#_ef8a6b81-6235-555e-aaf1-c61685b16ffe"/>
+  </nc:ContingencyPowerFlowResult>
+</rdf:RDF>
