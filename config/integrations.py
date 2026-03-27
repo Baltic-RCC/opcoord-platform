@@ -3,6 +3,16 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
 
 
+class OperatorFabricSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=Path(__file__).parent.joinpath(".env"),
+                                      env_prefix="OPFAB_",
+                                      extra="ignore")
+
+    host: str
+    username: str
+    password: SecretStr
+
+
 class ElasticSettings(BaseSettings):
     model_config = SettingsConfigDict(env_file=Path(__file__).parent.joinpath(".env"),
                                       env_prefix="ELASTIC_",
