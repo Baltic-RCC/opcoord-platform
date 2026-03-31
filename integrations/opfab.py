@@ -4,20 +4,26 @@ import json
 import tarfile
 from pathlib import Path
 from typing import Optional
+from pydantic import SecretStr
+from config.integrations import OperatorFabricSettings
+from loguru import logger
+
+
+conf = OperatorFabricSettings()
 
 
 class TokenManager:
     def __init__(
         self,
-        base_url: str,
-        username: str = "admin",
-        password: str = "test",
+        base_url: str = conf.host,
+        username: str = conf.username,
+        password: str = conf.password,
         port: int = 2002,
         timeout: int = 10,
     ):
         self.base_url = base_url.rstrip("/")
         self.username = username
-        self.password = password
+        self.password = password.get_secret_value() if isinstance(password, SecretStr) else password
         self.port = port
         self.timeout = timeout
 
@@ -94,7 +100,7 @@ class TokenManager:
 
 
 class AuthenticatedSession:
-    def __init__(self, base_url: str):
+    def __init__(self, base_url: str = conf.host):
         self.base_url = base_url.rstrip("/")
         self.tm = TokenManager(base_url=base_url)
         self.session = requests.Session()
@@ -106,16 +112,37 @@ class AuthenticatedSession:
         headers["Authorization"] = f"Bearer {token}"
         kwargs["headers"] = headers
 
+        # Execute the request
         response = self.session.request(method, url, **kwargs)
 
         # If token expired or invalid → refresh and retry once
         if response.status_code == 401:
             self.tm.refresh()
-
             headers["Authorization"] = f"Bearer {self.tm.access_token}"
             kwargs["headers"] = headers
-
             response = self.session.request(method, url, **kwargs)
+
+        # Inspect response for common shapes (requests-like, dict, or custom)
+        status = None
+        try:
+            if hasattr(response, "status_code"):
+                status = int(getattr(response, "status_code"))
+            elif isinstance(response, dict):
+                status = int(response.get("status") or response.get("status_code") or response.get("code") or 0)
+            elif hasattr(response, "get"):
+                status = int(response.get("status") or response.get("status_code") or response.get("code") or 0)
+        except Exception:
+            logger.debug("Unable to parse status code from OperatorFabric response", response=response)
+
+        # Log success or failure based on status when available
+        if status:
+            if 200 <= status < 300:
+                logger.success(f"Card published to OperatorFabric successfully (status={status})")
+            else:
+                logger.error(f"OperatorFabric returned error status={status}; response={response}")
+        else:
+            # No status available: log the raw response for debugging
+            logger.warning(f"OperatorFabric returned an unexpected response shape; response={response}")
 
         response.raise_for_status()
         return response
@@ -177,7 +204,6 @@ if __name__ == "__main__":
     tm = TokenManager(
         base_url="http://localhost",
         username="admin",
-        # username="operator1_fr",
         password="test"
     )
     api_token = tm.get_valid_token()

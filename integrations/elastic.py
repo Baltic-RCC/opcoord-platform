@@ -19,7 +19,7 @@ class Elastic:
     def __init__(self, server: str = conf.host, api_key: str = conf.api_key, debug: bool = False):
         self.server = server
         self.debug = debug
-        self.client = Elasticsearch(self.server, api_key=api_key)
+        self.client = Elasticsearch(self.server, api_key=api_key.get_secret_value())
 
     @staticmethod
     def convert_json_to_ndjson(data: List):
@@ -65,7 +65,7 @@ class Elastic:
         if json_message.get('args', None):  # TODO revise if this is proper solution
             json_message.pop('args')
         json_data = json.dumps(json_message, default=str, ensure_ascii=True, skipkeys=True)
-        headers = {"Authorization": f"ApiKey {api_key}", "Content-Type": "application/json"}
+        headers = {"Authorization": f"ApiKey {api_key.get_secret_value()}", "Content-Type": "application/json"}
         response = requests.post(url=url, data=json_data.encode(), headers=headers, verify=False)
         if json.loads(response.content).get('error'):
             logger.error(f"Send to Elasticsearch responded with error: {response.text}")
@@ -130,7 +130,7 @@ class Elastic:
             # Executing POST to push messages into ELK
             if debug:
                 logger.debug(f"Sending batch ({batch}-{batch + batch_size})/{len(json_message_list)} to {url}")
-            headers = {"Authorization": f"ApiKey {api_key}", "Content-Type": "application/x-ndjson"}
+            headers = {"Authorization": f"ApiKey {api_key.get_secret_value()}", "Content-Type": "application/x-ndjson"}
             data = (Elastic.convert_json_to_ndjson(json_message_list[batch:batch + batch_size]) + "\n").encode()
             response = requests.post(url=url,
                                      data=data,

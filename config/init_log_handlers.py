@@ -123,7 +123,7 @@ if conf.elastic_handler:
 
 
 # Exclude logs from integration modules
-modules_to_exclude = conf.exclude_loggers.split(",") if conf.exclude_loggers else []
+modules_to_exclude = conf.exclude_loggers if conf.exclude_loggers else []
 if modules_to_exclude:
     for m in modules_to_exclude:
         logging.getLogger(m).propagate = False
