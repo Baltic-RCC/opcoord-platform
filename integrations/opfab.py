@@ -103,6 +103,7 @@ class AuthenticatedSession:
     def __init__(self, base_url: str = conf.host):
         self.base_url = base_url.rstrip("/")
         self.tm = TokenManager(base_url=base_url)
+        logger.info(f"Connecting to OperatorFabric at {self.base_url} with user '{self.tm.username}'")
         self.session = requests.Session()
 
     def request(self, method, url, **kwargs):
@@ -137,7 +138,7 @@ class AuthenticatedSession:
         # Log success or failure based on status when available
         if status:
             if 200 <= status < 300:
-                logger.success(f"Card published to OperatorFabric successfully (status={status})")
+                logger.success(f"Request published to OperatorFabric successfully (status={status})")
             else:
                 logger.error(f"OperatorFabric returned error status={status}; response={response}")
         else:

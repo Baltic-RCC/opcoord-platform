@@ -4,6 +4,7 @@ import pika
 import traceback
 import signal
 from typing import List, Optional
+from pydantic import SecretStr
 from concurrent.futures import ThreadPoolExecutor
 from loguru import logger
 from config.integrations import RabbitMqSettings
@@ -24,7 +25,9 @@ class BlockingClient:
         self.connection_params = {
             'host': host,
             'port': port,
-            'credentials': pika.PlainCredentials(username, password)
+            'credentials': pika.PlainCredentials(
+                username,
+                password.get_secret_value() if isinstance(password, SecretStr) else password)
         }
         self.message_converter = message_converter
         self.message_handler = message_handler
@@ -172,7 +175,8 @@ class SingleMessageConsumer:
                  log_body: bool = False):
         self._host, self._port, self._vhost = host, int(port), vhost
         self._queue = queue
-        self._username, self._password = username, password
+        self._username = username
+        self._password = password.get_secret_value() if isinstance(password, SecretStr) else password
         self.reply_to = reply_to
         self.message_handlers = message_handlers or []
         self.message_converter = message_converter
@@ -384,13 +388,14 @@ class RMQConsumer:
         self._queue = queue
         self._heartbeat = heartbeat
         self._username = username
+        self._password = password.get_secret_value() if isinstance(password, SecretStr) else password
         self._executor = ThreadPoolExecutor()
         self._executor_stopped = False
 
         self._connection_parameters = pika.ConnectionParameters(host=self._host,
                                                                 port=self._port,
                                                                 virtual_host=self._vhost,
-                                                                credentials=pika.PlainCredentials(username, password),
+                                                                credentials=pika.PlainCredentials(self._username, self._password),
                                                                 heartbeat=self._heartbeat or None,
                                                                 )
 
@@ -696,7 +701,7 @@ class ReconnectingConsumer:
         self._heartbeat = heartbeat
         self._reply_to = reply_to
         self._username = username
-        self.__password = password
+        self._password = password.get_secret_value() if isinstance(password, SecretStr) else password
         self.message_handler = message_handler
         self.message_converter = message_converter
         self._consumer = RMQConsumer(host=self._host,
@@ -706,7 +711,7 @@ class ReconnectingConsumer:
                                      heartbeat=self._heartbeat,
                                      reply_to=self._reply_to,
                                      username=self._username,
-                                     password=self.__password,
+                                     password=self._password,
                                      message_handlers=self.message_handler,
                                      message_converter=self.message_converter)
 

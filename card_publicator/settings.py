@@ -10,10 +10,11 @@ from config.integrations import ElasticSettings, RabbitMqSettings
 class WorkerSettings(BaseSettings):
     worker_name: str = "card-publicator"
     worker_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    rmq_queue_in: str = "card_publication_queue"
+    rmq_queue_in: str = "opcoord.cards.publish"
 
 
 class BusinessSettings(BaseSettings):
+    cards_index: str = "dev-opcoord-cards"
     debug: bool = False
 
 

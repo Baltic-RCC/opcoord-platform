@@ -39,14 +39,13 @@ class RootPublicationHandler:
 
         # Extract properties
         message_type = getattr(properties, "headers").get('message-type')
-        message_type = getattr(properties, "headers").get('message-type')
         scenario_time = getattr(properties, "headers").get('scenario-time', datetime.now(timezone.utc))
         time_horizon = getattr(properties, "headers").get('time-horizon')
         run_id = getattr(properties, "headers").get('run-id')
         version = getattr(properties, "headers").get('version')
 
         # Run card builder
-        instance_id = f"{time_horizon}_{run_id}_{version}_{message_id})"
+        instance_id = f"{time_horizon}_{run_id}_{version}_{message_id}"
         card_factory = builders.CardFactory()
         card = card_factory.build(
             card_type=message_type.lower(),
@@ -60,6 +59,14 @@ class RootPublicationHandler:
         # Publish to OperatorFabric
         card_json = card.model_dump(exclude_none=True)
         response = self.opfab.post_card(card_json=card_json)
+        logger.info(f"Card publication details: {response.json()}")
+
+        # Publish to Elasticsearch
+        if response.status_code == 201 and "id" in response.json():
+            card_json.update(response.json())
+            response = self.elastic.send_to_elastic(index=conf.publicator.cards_index,
+                                                    json_message=card_json,
+                                                    id=card_json.get("id"))
 
         logger.success(f"Message handling completed successfully")
 

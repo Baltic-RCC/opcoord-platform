@@ -19,6 +19,7 @@ class Elastic:
     def __init__(self, server: str = conf.host, api_key: str = conf.api_key, debug: bool = False):
         self.server = server
         self.debug = debug
+        logger.info(f"Connecting to Elastic at {self.server}")
         self.client = Elasticsearch(self.server, api_key=api_key.get_secret_value())
 
     @staticmethod
