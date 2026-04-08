@@ -1,0 +1,44 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<rdf:RDF xmlns:dcterms="http://purl.org/dc/terms/#" xmlns:nc="https://cim4.eu/ns/nc#" xmlns:cim="https://cim.ucaiug.io/ns#" xmlns:md="http://iec.ch/TC57/61970-552/ModelDescription/1#" xmlns:dcat="http://www.w3.org/ns/dcat#" xmlns:prov="http://www.w3.org/ns/prov#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:eumd="https://cim4.eu/ns/Metadata-European#">
+  <md:FullModel rdf:about="urn:uuid:154e27cb-b070-405e-92f0-f9a9e226ad73">
+    <dcterms:identifier>urn:uuid:154e27cb-b070-405e-92f0-f9a9e226ad73</dcterms:identifier>
+    <md:Model.description>Instance of RemedialActionSchedule profile</md:Model.description>
+    <dcterms:title>2026-04-03T10:31:39Z_RAS_0e420418</dcterms:title>
+    <dcterms:conformsTo rdf:resource="https://ap.cim4.eu/RemedialActionSchedule/2.3"/>
+    <dcterms:publisher rdf:resource="https://energy.referencedata.eu/EIC/38X-BALTIC-RSC-H"/>
+    <dcterms:accessRights rdf:resource="https://energy.referencedata.eu/Confidentiality/Confidential"/>
+    <eumd:Model.applicationSoftware>BALTIC RCC CUSTOM</eumd:Model.applicationSoftware>
+    <prov:wasGeneratedBy rdf:resource="https://energy.referencedata.eu/CSA-1D-00-RAS"/>
+    <md:Model.created>2026-04-03T10:31:39Z</md:Model.created>
+    <md:Model.version>1</md:Model.version>
+    <dcat:startDate>2026-04-03T08:00:00Z</dcat:startDate>
+    <dcat:endDate>2026-04-03T09:00:00Z</dcat:endDate>
+    <dcat:keyword>RAS</dcat:keyword>
+  </md:FullModel>
+  <nc:GenericValueTimePoint rdf:ID="_40b87c13-f51a-4983-8cc0-b642d2e72ccb">
+    <nc:GenericValueTimePoint.GenericValueSchedule rdf:resource="#_bcb69bf5-f16c-44c4-b706-2d3af5be7b7b"/>
+    <nc:GenericValueTimePoint.atTime>2026-04-03T08:00:00Z</nc:GenericValueTimePoint.atTime>
+    <nc:GenericValueTimePoint.value>0.0</nc:GenericValueTimePoint.value>
+  </nc:GenericValueTimePoint>
+  <nc:GenericValueTimePoint rdf:ID="_dd95932c-0a52-4384-b5f8-a67bd8ba2edb">
+    <nc:GenericValueTimePoint.GenericValueSchedule rdf:resource="#_bcb69bf5-f16c-44c4-b706-2d3af5be7b7b"/>
+    <nc:GenericValueTimePoint.atTime>2026-04-03T09:00:00Z</nc:GenericValueTimePoint.atTime>
+    <nc:GenericValueTimePoint.value>0.0</nc:GenericValueTimePoint.value>
+  </nc:GenericValueTimePoint>
+  <nc:GridStateIntensitySchedule rdf:ID="_bcb69bf5-f16c-44c4-b706-2d3af5be7b7b">
+    <cim:IdentifiedObject.mRID>bcb69bf5-f16c-44c4-b706-2d3af5be7b7b</cim:IdentifiedObject.mRID>
+    <nc:BaseTimeSeries.interpolationKind rdf:resource="https://cim4.eu/ns/nc#TimeSeriesInterpolationKind.next"/>
+    <nc:GenericValueSchedule.RemedialActionSchedule rdf:resource="#_8beadd99-d3b5-4ee8-b8ae-748b95861bea"/>
+    <nc:GridStateIntensitySchedule.GridStateAlteration rdf:resource="#_72a26c55-ae5d-6d82-7263-ad9f88e4bd9d"/>
+  </nc:GridStateIntensitySchedule>
+<nc:RemedialActionSchedule rdf:ID="_8d2ace48-c3a5-4de2-b9fe-748b95861bea">
+    <cim:IdentifiedObject.mRID>8beadd99-d3b5-4ee8-b8ae-748b95861bea</cim:IdentifiedObject.mRID>
+    <cim:IdentifiedObject.name>LN XYZ</cim:IdentifiedObject.name>
+    <cim:IdentifiedObject.description>Test description</cim:IdentifiedObject.description>
+    <nc:RemedialActionSchedule.statusKind rdf:resource="https://cim4.eu/ns/nc#RemedialActionScheduleStatusKind.proposed"/>
+    <nc:RemedialActionSchedule.AssignedRegion rdf:resource="https://energy.referencedata.eu/EIC/10YLT-1001A0008Q"/>
+    <nc:RemedialActionSchedule.ProposingEntity rdf:resource="https://energy.referencedata.eu/EIC/38X-BALTIC-RSC-H"/>
+    <nc:RemedialActionSchedule.RemedialAction rdf:resource="#_8c16e29-87e1-7b35-8d3f-4a9caa9d4e2a"/>
+    <nc:RemedialActionSchedule.Contingency rdf:resource="#_3eacea9e-2032-5535-ee66-d826d46a8713"/>
+  </nc:RemedialActionSchedule>
+  </rdf:RDF>
