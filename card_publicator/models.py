@@ -5,7 +5,7 @@ from typing import Optional, List, Any, Dict, Literal
 
 
 class Card(BaseModel):
-    publisher: str = Field(default="rcc-service-user")
+    publisher: str = Field(default="martynas")
     processVersion: str
     process: str
     processInstanceId: str
@@ -43,5 +43,5 @@ class Card(BaseModel):
 
 
 if __name__ == "__main__":
-    conf = get_settings()
-    print(conf)
+    card = Card()
+    print(card)

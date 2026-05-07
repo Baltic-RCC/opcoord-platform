@@ -311,14 +311,7 @@ def normalize_cim_payload(payload: dict, root_only: bool = True) -> pd.DataFrame
 
 if __name__ == "__main__":
     # Testing
-    rdf_xml = r"C:\Users\martynas.karobcikas\Downloads\CO_1_10X1001A1001A55Y_2025-09-21T22_00_00_2025-09-22T22_00_00.xml"
-    # rdf_xml = r"C:\Users\martynas.karobcickas\Documents\Python projects\RAO\test-data\TC1_assessed_elements.xml"
-    # rdf_xml = r"C:\Users\martynas.karobcickas\Documents\Python projects\RAO\test-data\TC1_contingencies.xml"
-    # rdf_xml = r"C:\Users\martynas.karobcickas\Documents\Python projects\RAO\test-data\TC1_remedial_actions.xml"
-
-    # result = convert_cim_rdf_to_json(rdf_xml, root_class=["RemedialActionSchedule"], key_mode="local")
-    # result = convert_cim_rdf_to_json(rdf_xml, root_class=["RemedialActionSchedule"], key_mode="qualified")
-    # result = convert_cim_rdf_to_json(rdf_xml, root_class=["GridStateAlterationRemedialAction"], key_mode="local")
+    rdf_xml = Path(__file__).parent.parent.joinpath("tests/data/nc_sar.xml")
     result = convert_cim_rdf_to_json(rdf_xml, root_class=["OrdinaryContingency", "ExceptionalContingency"], key_mode="local")
 
     print(json.dumps(result, indent=2))

@@ -62,11 +62,11 @@ class RootPublicationHandler:
         logger.info(f"Card publication details: {response.json()}")
 
         # Publish to Elasticsearch
-        if response.status_code == 201 and "id" in response.json():
-            card_json.update(response.json())
-            response = self.elastic.send_to_elastic(index=conf.publicator.cards_index,
-                                                    json_message=card_json,
-                                                    id=card_json.get("id"))
+        # if response.status_code == 201 and "id" in response.json():
+        #     card_json.update(response.json())
+        #     response = self.elastic.send_to_elastic(index=conf.publicator.cards_index,
+        #                                             json_message=card_json,
+        #                                             id=card_json.get("id"))
 
         logger.success(f"Message handling completed successfully")
 
@@ -82,7 +82,7 @@ if __name__ == '__main__':
         "project-name": "RMM_X",
         "run-id": "00",
         "source-module": "CROSA",
-        "scenario-time": "2026-03-30T09:30:00+00:00",
+        "scenario-time": "2026-04-21T09:30:00+00:00",
         "time-horizon": "1D",
         "version": "1",
     }

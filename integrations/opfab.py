@@ -17,8 +17,8 @@ class TokenManager:
         self,
         base_url: str = conf.host,
         username: str = conf.username,
-        password: str = conf.password,
-        port: int = 2002,
+        password: str | SecretStr = conf.password,
+        port: int | None = None,
         timeout: int = 10,
     ):
         self.base_url = base_url.rstrip("/")
@@ -33,13 +33,17 @@ class TokenManager:
 
     @property
     def token_url(self):
-        return f"{self.base_url}:{self.port}/auth/token"
+        if self.port:
+            return f"{self.base_url}:{self.port}/auth/token"
+        else:
+            return f"{self.base_url}/auth/token"
 
     def _request_token(self, data: dict) -> dict:
         response = requests.post(
-            self.token_url,
+            url=self.token_url,
             data=data,
             timeout=self.timeout,
+            verify=conf.ssl_verify,
         )
 
         response.raise_for_status()
@@ -105,6 +109,7 @@ class AuthenticatedSession:
         self.tm = TokenManager(base_url=base_url)
         logger.info(f"Connecting to OperatorFabric at {self.base_url} with user '{self.tm.username}'")
         self.session = requests.Session()
+        self.session.verify = conf.ssl_verify
 
     def request(self, method, url, **kwargs):
         token = self.tm.get_valid_token()
@@ -140,20 +145,21 @@ class AuthenticatedSession:
             if 200 <= status < 300:
                 logger.success(f"Request published to OperatorFabric successfully (status={status})")
             else:
-                logger.error(f"OperatorFabric returned error status={status}; response={response}")
+                logger.error(f"OperatorFabric returned error status={status}; response={response.content}")
         else:
             # No status available: log the raw response for debugging
             logger.warning(f"OperatorFabric returned an unexpected response shape; response={response}")
 
         response.raise_for_status()
+
         return response
 
     def post_card(self, card_json=None, **kwargs):
-        endpoint_url = f"{self.base_url}:2102/cards"
+        endpoint_url = f"{self.base_url}/cardspub/cards"
         return self.request("POST", url=endpoint_url, json=card_json, **kwargs)
 
     def get_card(self, card_id: str, **kwargs):
-        endpoint_url = f"{self.base_url}:2002/cards-consultation/cards/{card_id}"
+        endpoint_url = f"{self.base_url}/cards-consultation/cards/{card_id}"
         return self.request("GET", url=endpoint_url, **kwargs)
 
     def post_process_bundle(self, bundle_folder_name: str, **kwargs):
@@ -167,7 +173,7 @@ class AuthenticatedSession:
         print("Archive created:", output_tar)
 
         # Send the tar.gz file to the API
-        endpoint_url = f"{self.base_url}:2100/businessconfig/processes"
+        endpoint_url = f"{self.base_url}/businessconfig/processes"
         headers = {"accept": "application/json"}
         with open("bundle.tar.gz", "rb") as f:
             files = {
@@ -201,30 +207,33 @@ class AuthenticatedSession:
 
 
 if __name__ == "__main__":
+    from pathlib import Path
+
     # Example usage of TokenManager and AuthenticatedSession
     tm = TokenManager(
-        base_url="http://localhost",
-        username="admin",
-        password="test"
+        base_url=conf.host,
+        username=conf.username,
+        password=conf.password
     )
     api_token = tm.get_valid_token()
 
     # Client with automatic token handling
-    client = AuthenticatedSession(base_url="http://localhost")
+    client = AuthenticatedSession(base_url=conf.host)
 
     # Send example card data
-    with open("card.json", "r") as f:
-        payload = json.load(f)
-    payload["startDate"] = int(time.time() * 1000)
-    response = client.post_card(card_json=payload)
-
-    # Get card by ID
-    card_id = "defaultProcess.hello-world-1"
-    response = client.get_card(card_id=card_id)
-    print(json.dumps(response.json(), indent=4, ensure_ascii=False))
+    # with open("card.json", "r") as f:
+    #     payload = json.load(f)
+    # payload["startDate"] = int(time.time() * 1000)
+    # response = client.post_card(card_json=payload)
+    #
+    # # Get card by ID
+    # card_id = "defaultProcess.hello-world-1"
+    # response = client.get_card(card_id=card_id)
+    # print(json.dumps(response.json(), indent=4, ensure_ascii=False))
 
     # Upload process bundle
-    response = client.post_process_bundle(bundle_folder_name="bundle")
+    bundle_path = str(Path(__file__).parent.parent.joinpath("resources/process_bundles/crosa"))
+    response = client.post_process_bundle(bundle_folder_name=bundle_path)
 
     # Setup perimeter
     with open("perimeter.json", "r") as f:

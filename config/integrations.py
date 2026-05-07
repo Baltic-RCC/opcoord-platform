@@ -11,6 +11,7 @@ class OperatorFabricSettings(BaseSettings):
     host: str
     username: str
     password: SecretStr
+    ssl_verify: bool = False
 
 
 class ElasticSettings(BaseSettings):
@@ -21,6 +22,7 @@ class ElasticSettings(BaseSettings):
     host: str
     api_key: SecretStr
     batch_size: int = 1000
+    ssl_verify: bool = True
 
 
 class RabbitMqSettings(BaseSettings):

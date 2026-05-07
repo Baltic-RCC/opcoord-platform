@@ -6,4 +6,4 @@ sar:
   severity: "INFORMATION"
   title: {"key": "crosa.summary"}
   summary: {"key": "crosa.title"}
-  groupRecipients: ["Dispatcher"]
+  groupRecipients: ["ADMIN"]
