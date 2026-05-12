@@ -1,5 +1,5 @@
 # Define base container image (platform has to be defined if using with ARM64 architecture)
-ARG PYTHON_BASE_TAG=0.0.1
+ARG PYTHON_BASE_TAG=latest
 FROM balticrcc/opcoord-base:${PYTHON_BASE_TAG}
 #FROM --platform=linux/amd64 python:3.11-slim
 
