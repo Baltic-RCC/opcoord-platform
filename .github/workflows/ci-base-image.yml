@@ -16,10 +16,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Extract Docker tag from Git tag
+      - name: Extract Docker tag
         id: vars
         run: |
-          VERSION="${GITHUB_REF_NAME#base-v}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#base-v}"
+          fi
+
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "image=${{ vars.DOCKER_USERNAME }}/opcoord-base" >> "$GITHUB_OUTPUT"
 
