@@ -1,6 +1,5 @@
 # Define base container image (platform has to be defined if using with ARM64 architecture)
 FROM python:3.11-slim AS opcoord-base
-#FROM --platform=linux/amd64 python:3.11-slim as rao-base
 
 # Set non root user
 ARG GID=1000
