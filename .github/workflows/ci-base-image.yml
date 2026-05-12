@@ -36,7 +36,7 @@ jobs:
           file: Dockerfile
           push: true
           tags: |
-            $${{ steps.vars.outputs.image }}:latest
+            ${{ steps.vars.outputs.image }}:latest
             ${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.version }}
 
       - name: Display Success Message
