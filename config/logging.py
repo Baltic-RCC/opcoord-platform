@@ -19,7 +19,7 @@ class Logging(BaseSettings):
     enqueue: bool = False
     catch: bool = False
     elastic_handler: bool = False
-    elastic_index: str = "rao-logs"
+    elastic_index: str = "dev-opcoord-logs"
 
 
 if __name__ == "__main__":

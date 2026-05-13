@@ -7,7 +7,8 @@ from pathlib import Path
 
 
 # Load card configuration from YAML file
-with open("cards.yaml", "r", encoding="utf-8") as f:
+path = Path(__file__).parent.joinpath("cards.yaml")
+with open(path, "r", encoding="utf-8") as f:
     config = yaml.safe_load(f)
 
 
