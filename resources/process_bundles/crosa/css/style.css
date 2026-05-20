@@ -1,0 +1,73 @@
+.cq {
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  padding: 14px 16px;
+  max-width: 1200px;
+}
+
+.cq-section { margin-top: 10px; }
+.cq-section-title {
+  font-weight: 700;
+  margin-bottom: 10px;
+  opacity: 0.95;
+}
+
+.cq-table-wrap {
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.cq-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.cq-table thead th {
+  text-align: left;
+  padding: 10px 12px;
+  background: rgba(255,255,255,0.04);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  font-weight: 700;
+}
+
+.cq-table tbody td {
+  padding: 9px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  vertical-align: middle;
+}
+
+.cq-table tbody tr:hover td {
+  background: rgba(255,255,255,0.03);
+}
+
+.cq-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  word-break: break-word;
+}
+
+.cq-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.06);
+  line-height: 18px;
+}
+
+.cq-pill-bad {
+  border-color: rgba(255, 80, 80, 0.35);
+  background: rgba(255, 80, 80, 0.12);
+}
+
+.cq-row-violation td {
+  background: rgba(255, 80, 80, 0.06);
+}
+
+.cq-muted { opacity: 0.7; }
+
+/* show dash when base-case match is missing */
+.cq-empty:empty::before {
+  content: "—";
+  opacity: 0.65;
+}

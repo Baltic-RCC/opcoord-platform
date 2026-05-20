@@ -1,0 +1,22 @@
+{
+	"id":"crosa",
+	"name": "CSA CROSA",
+	"version":"1",
+	"uiVisibility": {
+		"monitoring": true,
+		"logging": true,
+		"calendar": true
+	},
+	"states":{
+		"sar" : {
+			"name": "CROSA SAR results",
+			"templateName" : "sar",
+			"color": "#8bcdcd",
+			"styles" : [ "style" ],
+			"acknowledgmentAllowed": "Always",
+			"automaticPinWhenAcknowledged" : false,
+			"showAcknowledgmentFooter" : "ForAllUsers",
+			"showDetailCardHeader": true
+		}
+	}
+}

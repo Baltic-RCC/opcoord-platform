@@ -1,0 +1,10 @@
+{
+	"process": {
+		"name": "RCC CSA CROSA process"
+	},
+	"crosa":{
+		"title":"RCC CSA",
+		"summary":"Message received from RCC"
+	}
+}
+
