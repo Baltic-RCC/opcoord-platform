@@ -1,0 +1,87 @@
+name: Sync CROSA bundle from GitLab
+
+permissions:
+  contents: write
+  pull-requests: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      gitlab_ref:
+        description: 'GitLab branch or tag to pull from'
+        required: false
+        default: 'main'
+
+jobs:
+  sync-bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set variables
+        run: |
+          echo "GITLAB_REF=${{ inputs.gitlab_ref || 'main' }}" >> $GITHUB_ENV
+          echo "TIMESTAMP=$(date +%Y%m%d%H%M)" >> $GITHUB_ENV
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: '3.11'
+
+      - name: Download CROSA bundle from GitLab
+        env:
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+          GITLAB_BASE_URL: ${{ secrets.GITLAB_BASE_URL }}
+          GITLAB_PROJECT_ID: ${{ secrets.GITLAB_PROJECT_ID }}
+          GITLAB_BUNDLE_PATH: ${{ secrets.GITLAB_BUNDLE_PATH }}
+        run: |
+          mkdir -p resources/process_bundles
+          curl --fail --silent --show-error \
+            --header "PRIVATE-TOKEN: ${GITLAB_TOKEN}" \
+            "${GITLAB_BASE_URL}/api/v4/projects/${GITLAB_PROJECT_ID}/repository/archive.zip?sha=${GITLAB_REF}&path=${GITLAB_BUNDLE_PATH}" \
+            --output resources/process_bundles/crosa_bundle.zip
+
+      - name: Validate bundle
+        env:
+          GITLAB_BUNDLE_PATH: ${{ secrets.GITLAB_BUNDLE_PATH }}
+        run: |
+          uv run scripts/validate_bundle.py \
+            resources/process_bundles/crosa_bundle.zip \
+            --bundle-path "${GITLAB_BUNDLE_PATH}"
+
+      - name: Check for changes
+        id: diff
+        run: |
+          git diff --quiet resources/process_bundles/crosa_bundle.zip \
+            && echo "changed=false" >> $GITHUB_OUTPUT \
+            || echo "changed=true" >> $GITHUB_OUTPUT
+
+      - name: Create branch, commit and open PR
+        if: steps.diff.outputs.changed == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="chore/sync-crosa-bundle-${{ env.TIMESTAMP }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add resources/process_bundles/crosa_bundle.zip
+          git commit -m "chore: sync crosa bundle from gitlab [${{ env.GITLAB_REF }}]"
+          git push origin "$BRANCH"
+          gh pr create \
+            --title "chore: sync crosa bundle from gitlab" \
+            --body "## CROSA Bundle Sync
+
+Synced from GitLab ref: \`${{ env.GITLAB_REF }}\`
+Run timestamp: \`${{ env.TIMESTAMP }}\`
+
+### Validation results
+All checks passed:
+- Directory structure verified
+- Required files present (config.json, i18n.json, css/style.css, template/sar.handlebars)
+- JSON files valid" \
+            --base main \
+            --head "$BRANCH"
+
+      - name: No changes detected
+        if: steps.diff.outputs.changed == 'false'
+        run: echo "Bundle is already up to date, no PR needed."
