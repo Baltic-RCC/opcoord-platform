@@ -80,18 +80,11 @@ jobs:
           git add resources/process_bundles/crosa/
           git commit -m "chore: sync crosa bundle from gitlab [${{ env.GITLAB_REF }}]"
           git push origin "$BRANCH"
+          printf '## CROSA Bundle Sync\n\nSynced from GitLab ref: `%s`\nRun timestamp: `%s`\n\n### Validation results\nAll checks passed:\n- Directory structure verified\n- Required files present (config.json, i18n.json, css/style.css, template/sar.handlebars)\n- JSON files valid\n' \
+            "${{ env.GITLAB_REF }}" "${{ env.TIMESTAMP }}" > /tmp/pr_body.md
           gh pr create \
             --title "chore: sync crosa bundle from gitlab" \
-            --body "## CROSA Bundle Sync
-
-Synced from GitLab ref: \`${{ env.GITLAB_REF }}\`
-Run timestamp: \`${{ env.TIMESTAMP }}\`
-
-### Validation results
-All checks passed:
-- Directory structure verified
-- Required files present (config.json, i18n.json, css/style.css, template/sar.handlebars)
-- JSON files valid" \
+            --body-file /tmp/pr_body.md \
             --base main \
             --head "$BRANCH"
 
