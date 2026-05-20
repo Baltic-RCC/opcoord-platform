@@ -34,26 +34,39 @@ jobs:
           GITLAB_PROJECT_ID: ${{ secrets.GITLAB_PROJECT_ID }}
           GITLAB_BUNDLE_PATH: ${{ secrets.GITLAB_BUNDLE_PATH }}
         run: |
-          mkdir -p resources/process_bundles
           curl --fail --silent --show-error \
             --header "PRIVATE-TOKEN: ${GITLAB_TOKEN}" \
             "${GITLAB_BASE_URL}/api/v4/projects/${GITLAB_PROJECT_ID}/repository/archive.zip?sha=${GITLAB_REF}&path=${GITLAB_BUNDLE_PATH}" \
-            --output resources/process_bundles/crosa_bundle.zip
+            --output /tmp/crosa_bundle.zip
 
       - name: Validate bundle
         env:
           GITLAB_BUNDLE_PATH: ${{ secrets.GITLAB_BUNDLE_PATH }}
         run: |
           uv run scripts/validate_bundle.py \
-            resources/process_bundles/crosa_bundle.zip \
+            /tmp/crosa_bundle.zip \
             --bundle-path "${GITLAB_BUNDLE_PATH}"
+
+      - name: Extract bundle into resources
+        env:
+          GITLAB_BUNDLE_PATH: ${{ secrets.GITLAB_BUNDLE_PATH }}
+        run: |
+          TMP_DIR=$(mktemp -d)
+          unzip -q /tmp/crosa_bundle.zip -d "$TMP_DIR"
+          TOP_DIR=$(ls "$TMP_DIR")
+          rm -rf resources/process_bundles/crosa
+          mkdir -p resources/process_bundles/crosa
+          cp -r "$TMP_DIR/$TOP_DIR/${GITLAB_BUNDLE_PATH}/." resources/process_bundles/crosa/
+          rm -rf "$TMP_DIR"
 
       - name: Check for changes
         id: diff
         run: |
-          git diff --quiet resources/process_bundles/crosa_bundle.zip \
-            && echo "changed=false" >> $GITHUB_OUTPUT \
-            || echo "changed=true" >> $GITHUB_OUTPUT
+          if [ -z "$(git status --porcelain resources/process_bundles/crosa)" ]; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
 
       - name: Create branch, commit and open PR
         if: steps.diff.outputs.changed == 'true'
@@ -64,7 +77,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b "$BRANCH"
-          git add resources/process_bundles/crosa_bundle.zip
+          git add resources/process_bundles/crosa/
           git commit -m "chore: sync crosa bundle from gitlab [${{ env.GITLAB_REF }}]"
           git push origin "$BRANCH"
           gh pr create \
