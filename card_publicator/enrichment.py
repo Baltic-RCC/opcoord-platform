@@ -25,6 +25,23 @@ class EnrichmentStats:
     contingency_names_added: int = 0
     contingency_types_added: int = 0
 
+    @property
+    def fields_enriched(self) -> int:
+        return (
+            self.area_names_added
+            + self.proposed_by_names_added
+            + self.contingency_names_added
+            + self.contingency_types_added
+        )
+
+    @property
+    def fields_failed(self) -> int:
+        fields_attempted = (
+            self.base_case_power_flow_results
+            + (self.contingency_power_flow_results * 3)
+            + (self.remedial_action_schedules * 4)
+        )
+        return fields_attempted - self.fields_enriched
 
 class CardDataEnricher:
     CONTINGENCY_MATCH_FIELDS = (
@@ -53,16 +70,17 @@ class CardDataEnricher:
         self._contingency_by_identifier: dict[str, dict[str, Any] | None] = {}
 
     def enrich(self, payload: dict[str, Any]) -> dict[str, Any]:
-        stats = self.enrich_in_place(payload)
-        if self.debug:
-            logger.info(f"Card data enrichment completed: {stats}")
+        self.enrich_in_place(payload)
         return payload
 
     def enrich_in_place(self, payload: dict[str, Any]) -> EnrichmentStats:
+        profile_type = self._profile_type(payload)
+        logger.info(f"Enriching {profile_type} profile")
         stats = EnrichmentStats()
         stats = self._enrich_base_case_power_flow_results(payload, stats)
         stats = self._enrich_contingency_power_flow_results(payload, stats)
         stats = self._enrich_remedial_action_schedules(payload, stats)
+        logger.success(f"Enriched {profile_type} successfully, "f"{stats.fields_enriched} count of fields enriched, "f"{stats.fields_failed} count of fields failed to enrich.")
         return stats
 
     def _enrich_base_case_power_flow_results(self, payload: dict[str, Any], stats: EnrichmentStats) -> EnrichmentStats:
@@ -121,6 +139,7 @@ class CardDataEnricher:
             self._handle_missing(f"No area.name found for area EIC {area_eic}")
             return False
         item["AreaName"] = area_name
+        self._log_field_enriched(item, "AreaName", area_name)
         return True
 
     def _add_proposed_by_name(self, item: dict[str, Any]) -> bool:
@@ -134,6 +153,7 @@ class CardDataEnricher:
             self._handle_missing(f"No party.name found for party EIC {party_eic}")
             return False
         item["ProposedByName"] = party_name
+        self._log_field_enriched(item, "ProposedByName", party_name)
         return True
 
     def _add_contingency_fields(self, item: dict[str, Any]) -> tuple[bool, bool]:
@@ -152,11 +172,13 @@ class CardDataEnricher:
         type_added = False
         if name:
             item["ContingencyName"] = name
+            self._log_field_enriched(item, "ContingencyName", name)
             name_added = True
         else:
             self._handle_missing(f"No contingency name found for identifier {contingency_id}")
         if contingency_type:
             item["ContingencyType"] = contingency_type
+            self._log_field_enriched(item, "ContingencyType", contingency_type)
             type_added = True
         else:
             self._handle_missing(f"No contingency type found for identifier {contingency_id}")
@@ -223,6 +245,16 @@ class CardDataEnricher:
             records = response.to_dict(orient="records")
             return [record for record in records if isinstance(record, dict)]
         return []
+
+    @staticmethod
+    def _profile_type(payload: dict[str, Any]) -> str:
+        if CardDataEnricher._section_items(payload, "RemedialActionSchedule"):
+            return "RAS"
+        return "SAR"
+
+    def _log_field_enriched(self, item: dict[str, Any], field_name: str, value: Any) -> None:
+        if self.debug:
+            logger.debug(f"Enriched {field_name} for item {item.get('@id')}: {value}")
 
     @staticmethod
     def _section_items(payload: dict[str, Any], section_name: str) -> list[dict[str, Any]]:
@@ -299,10 +331,10 @@ if __name__ == "__main__":
     from card_publicator.rdf_converter import convert_cim_rdf_to_json
 
     def enrich_nc_xml_file(
-        input_path: str = r"C:\Users\lukas.navickas\Documents\Opcoord_testing\example_cards\nc_ras.xml",
+        input_path: str = r"C:\Users\lukas.navickas\Documents\Opcoord_testing\example_cards\SAR_20260425T0230_1D_1.xml",
         output_path: str = r"C:\Users\lukas.navickas\Documents\Opcoord_testing\enriched_cards\enriched_card_ras.json",
         strict: bool = False, # If strict = True, return ValueError for missing enrichment fields
-        debug: bool = True, # enable extended logs
+        debug: bool = False, # enable extended logs
         indent: int = 2,
     ) -> dict[str, Any]:
         # This local helper is only for manual testing. Production code should use
