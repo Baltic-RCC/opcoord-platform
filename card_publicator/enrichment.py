@@ -299,10 +299,10 @@ if __name__ == "__main__":
     from card_publicator.rdf_converter import convert_cim_rdf_to_json
 
     def enrich_nc_xml_file(
-        input_path: str = r"C:\Users\lukas.navickas\Documents\Opcoord_testing\example_cards\SAR_20260520T1130_ID_1.xml",
-        output_path: str = r"C:\Users\lukas.navickas\Documents\Opcoord_testing\enriched_cards\enriched_card.json",
-        strict: bool = False,
-        debug: bool = False,
+        input_path: str = r"C:\Users\lukas.navickas\Documents\Opcoord_testing\example_cards\nc_ras.xml",
+        output_path: str = r"C:\Users\lukas.navickas\Documents\Opcoord_testing\enriched_cards\enriched_card_ras.json",
+        strict: bool = False, # If strict = True, return ValueError for missing enrichment fields
+        debug: bool = True, # enable extended logs
         indent: int = 2,
     ) -> dict[str, Any]:
         # This local helper is only for manual testing. Production code should use
@@ -339,3 +339,5 @@ if __name__ == "__main__":
             output_file.write("\n")
 
         return payload
+
+    enrich_nc_xml_file()
