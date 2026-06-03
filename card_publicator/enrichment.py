@@ -25,6 +25,7 @@ class EnrichmentStats:
     proposed_by_names_added: int = 0
     contingency_names_added: int = 0
     contingency_types_added: int = 0
+    contingency_operator_added: int = 0
 
     @property
     def fields_enriched(self) -> int:
@@ -98,13 +99,14 @@ class CardDataEnricher:
                 proposed_by_names_added=stats.proposed_by_names_added,
                 contingency_names_added=stats.contingency_names_added,
                 contingency_types_added=stats.contingency_types_added,
+                contingency_operator_added=stats.contingency_operator_added,
             )
         return stats
 
     def _enrich_contingency_power_flow_results(self, payload: dict[str, Any], stats: EnrichmentStats) -> EnrichmentStats:
         for result in self._section_items(payload, "ContingencyPowerFlowResult"):
             area_added = self._add_area_name(result, "ReportedByRegion")
-            contingency_name_added, contingency_type_added = self._add_contingency_fields(result)
+            contingency_name_added, contingency_type_added, contingency_operator_added = self._add_contingency_fields(result)
             stats = EnrichmentStats(
                 base_case_power_flow_results=stats.base_case_power_flow_results,
                 contingency_power_flow_results=stats.contingency_power_flow_results + 1,
@@ -113,6 +115,7 @@ class CardDataEnricher:
                 proposed_by_names_added=stats.proposed_by_names_added,
                 contingency_names_added=stats.contingency_names_added + int(contingency_name_added),
                 contingency_types_added=stats.contingency_types_added + int(contingency_type_added),
+                contingency_operator_added=stats.contingency_operator_added + int(contingency_operator_added)
             )
         return stats
 
@@ -120,7 +123,7 @@ class CardDataEnricher:
         for schedule in self._section_items(payload, "RemedialActionSchedule"):
             area_added = self._add_area_name(schedule, "AssignedRegion")
             proposed_by_added = self._add_proposed_by_name(schedule)
-            contingency_name_added, contingency_type_added = self._add_contingency_fields(schedule)
+            contingency_name_added, contingency_type_added, contingency_operator_added = self._add_contingency_fields(schedule)
             stats = EnrichmentStats(
                 base_case_power_flow_results=stats.base_case_power_flow_results,
                 contingency_power_flow_results=stats.contingency_power_flow_results,
@@ -129,6 +132,7 @@ class CardDataEnricher:
                 proposed_by_names_added=stats.proposed_by_names_added + int(proposed_by_added),
                 contingency_names_added=stats.contingency_names_added + int(contingency_name_added),
                 contingency_types_added=stats.contingency_types_added + int(contingency_type_added),
+                contingency_operator_added=stats.contingency_operator_added + int(contingency_operator_added)
             )
         return stats
 
@@ -160,23 +164,25 @@ class CardDataEnricher:
         self._log_field_enriched(item, "ProposedByName", party_name)
         return True
 
-    def _add_contingency_fields(self, item: dict[str, Any]) -> tuple[bool, bool]:
+    def _add_contingency_fields(self, item: dict[str, Any]) -> tuple[bool, bool, bool]:
         contingency_id = self._normalize_identifier_reference(item.get("Contingency"))
         if not contingency_id:
             self._handle_missing(f"Missing Contingency in item {item.get('@id')}")
-            return False, False
+            return False, False, False
         contingency = self._get_contingency_by_identifier(contingency_id)
         if not contingency:
             self._handle_missing(f"No contingency document found for identifier {contingency_id}")
-            return False, False
+            return False, False, False
 
-        name = self._first_present(contingency, "name", "ContingencyEquipment.name")
-        contingency_type = self._first_present(contingency, "kind", "@type", "ContingencyEquipment.@type")
+        contingency_name = self._get_path(contingency, "name")
+        contingency_type = self._get_path(contingency, "@type")
+        contingency_operator = self._get_path(contingency, "EquipmentOperator")
         name_added = False
         type_added = False
-        if name:
-            item["ContingencyName"] = name
-            self._log_field_enriched(item, "ContingencyName", name)
+        co_operator_added = False
+        if contingency_name:
+            item["ContingencyName"] = contingency_name
+            self._log_field_enriched(item, "ContingencyName", contingency_name)
             name_added = True
         else:
             self._handle_missing(f"No contingency name found for identifier {contingency_id}")
@@ -186,7 +192,13 @@ class CardDataEnricher:
             type_added = True
         else:
             self._handle_missing(f"No contingency type found for identifier {contingency_id}")
-        return name_added, type_added
+        if contingency_operator:
+            item["ContingencyOperator"] = contingency_operator
+            self._log_field_enriched(item, "ContingencyOperator", contingency_operator)
+            co_operator_added = True
+        else:
+            self._handle_missing(f"No contingency operator found for identifier {contingency_id}")
+        return name_added, type_added, co_operator_added
 
     def _get_area_by_eic(self, eic: str) -> dict[str, Any] | None:
         if eic not in self._area_by_eic:
@@ -335,14 +347,6 @@ class CardDataEnricher:
                 return None
         return current
 
-    @staticmethod
-    def _first_present(document: dict[str, Any], *paths: str) -> Any:
-        for path in paths:
-            value = CardDataEnricher._get_path(document, path)
-            if value is not None and value != "":
-                return value
-        return None
-
     def _handle_missing(self, message: str) -> None:
         if self.strict:
             raise ValueError(message)
@@ -354,8 +358,8 @@ if __name__ == "__main__":
     from card_publicator.rdf_converter import convert_cim_rdf_to_json
 
     def enrich_nc_xml_file(
-        input_path: str = r"C:\Users\lukas.navickas\Documents\Opcoord_testing\example_cards\SAR_20260520T1130_ID_1.xml",
-        output_path: str = r"C:\Users\lukas.navickas\Documents\Opcoord_testing\enriched_cards\enriched_card_sar_ID.json",
+        input_path: str = r"C:\Users\lukas.navickas\Documents\Opcoord_testing\example_cards\test_ras_1.xml",
+        output_path: str = r"C:\Users\lukas.navickas\Documents\Opcoord_testing\enriched_cards\enriched_card_ras_test_1.json",
         strict: bool = False, # If strict = True, return ValueError for missing enrichment fields and fails
         debug: bool = True, # enable extended warning logs
         indent: int = 2,
