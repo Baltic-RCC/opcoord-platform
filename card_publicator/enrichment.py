@@ -4,8 +4,7 @@ import json
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
-
+from typing import Any, Literal
 from loguru import logger
 
 from integrations.elastic import Elastic
@@ -13,6 +12,8 @@ from integrations.elastic import Elastic
 
 DEFAULT_AREAS_INDEX = "config-areas"
 DEFAULT_CONTINGENCIES_INDEX = "csa-contingencies-*"
+
+NCProfileType = Literal["RAS", "SAR"]
 
 
 @dataclass(frozen=True)
@@ -42,6 +43,7 @@ class EnrichmentStats:
             + (self.remedial_action_schedules * 4)
         )
         return fields_attempted - self.fields_enriched
+
 
 class CardDataEnricher:
     CONTINGENCY_MATCH_FIELDS = (
@@ -77,9 +79,11 @@ class CardDataEnricher:
         profile_type = self._profile_type(payload)
         logger.info(f"Enriching {profile_type} profile")
         stats = EnrichmentStats()
-        stats = self._enrich_base_case_power_flow_results(payload, stats)
-        stats = self._enrich_contingency_power_flow_results(payload, stats)
-        stats = self._enrich_remedial_action_schedules(payload, stats)
+        if profile_type == "RAS":
+            stats = self._enrich_remedial_action_schedules(payload, stats)
+        elif profile_type == "SAR":
+            stats = self._enrich_base_case_power_flow_results(payload, stats)
+            stats = self._enrich_contingency_power_flow_results(payload, stats)
         logger.success(f"Enriched {profile_type} successfully, "f"{stats.fields_enriched} count of fields enriched, "f"{stats.fields_failed} count of fields failed to enrich.")
         return stats
 
@@ -246,11 +250,30 @@ class CardDataEnricher:
             return [record for record in records if isinstance(record, dict)]
         return []
 
+    def _profile_type(self, payload: dict[str, Any]) -> NCProfileType:
+        return self._validated_profile_type_from_full_model(payload)
+
     @staticmethod
-    def _profile_type(payload: dict[str, Any]) -> str:
-        if CardDataEnricher._section_items(payload, "RemedialActionSchedule"):
-            return "RAS"
-        return "SAR"
+    def _validated_profile_type_from_full_model(payload: dict[str, Any]) -> NCProfileType:
+        for full_model in CardDataEnricher._section_items(payload, "FullModel"):
+            keyword = full_model.get("keyword")
+            if isinstance(keyword, list):
+                keyword_values = keyword
+            else:
+                keyword_values = [keyword]
+
+            for keyword_value in keyword_values:
+                normalized_keyword = CardDataEnricher._normalize_profile_keyword(keyword_value)
+                if normalized_keyword == "RAS" or normalized_keyword == "SAR":
+                    return normalized_keyword
+        raise ValueError("FullModel keyword must be set to a supported NC profile type")
+
+    @staticmethod
+    def _normalize_profile_keyword(value: Any) -> str | None:
+        if value is None:
+            return None
+        normalized = str(value).strip().upper()
+        return normalized or None
 
     def _log_field_enriched(self, item: dict[str, Any], field_name: str, value: Any) -> None:
         if self.debug:
@@ -331,10 +354,10 @@ if __name__ == "__main__":
     from card_publicator.rdf_converter import convert_cim_rdf_to_json
 
     def enrich_nc_xml_file(
-        input_path: str = r"C:\Users\lukas.navickas\Documents\Opcoord_testing\example_cards\SAR_20260425T0230_1D_1.xml",
-        output_path: str = r"C:\Users\lukas.navickas\Documents\Opcoord_testing\enriched_cards\enriched_card_ras.json",
-        strict: bool = False, # If strict = True, return ValueError for missing enrichment fields
-        debug: bool = False, # enable extended logs
+        input_path: str = r"C:\Users\lukas.navickas\Documents\Opcoord_testing\example_cards\SAR_20260520T1130_ID_1.xml",
+        output_path: str = r"C:\Users\lukas.navickas\Documents\Opcoord_testing\enriched_cards\enriched_card_sar_ID.json",
+        strict: bool = False, # If strict = True, return ValueError for missing enrichment fields and fails
+        debug: bool = True, # enable extended warning logs
         indent: int = 2,
     ) -> dict[str, Any]:
         # This local helper is only for manual testing. Production code should use
