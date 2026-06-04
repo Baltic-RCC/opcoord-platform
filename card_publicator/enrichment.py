@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Literal
 from loguru import logger
@@ -17,6 +17,14 @@ NCProfileType = Literal["RAS", "SAR"]
 
 
 @dataclass(frozen=True)
+class ContingencyFieldEnrichment:
+    source_path: str
+    output_key: str
+    stats_key: str
+    missing_label: str
+
+
+@dataclass(frozen=True)
 class EnrichmentStats:
     base_case_power_flow_results: int = 0
     contingency_power_flow_results: int = 0
@@ -25,7 +33,7 @@ class EnrichmentStats:
     proposed_by_names_added: int = 0
     contingency_names_added: int = 0
     contingency_types_added: int = 0
-    contingency_operator_added: int = 0
+    contingency_operator_eic_added: int = 0
 
     @property
     def fields_enriched(self) -> int:
@@ -34,19 +42,33 @@ class EnrichmentStats:
             + self.proposed_by_names_added
             + self.contingency_names_added
             + self.contingency_types_added
+            + self.contingency_operator_eic_added
         )
 
     @property
     def fields_failed(self) -> int:
+        contingency_fields_attempted = len(CardDataEnricher.CONTINGENCY_FIELD_ENRICHMENTS)
         fields_attempted = (
             self.base_case_power_flow_results
-            + (self.contingency_power_flow_results * 3)
-            + (self.remedial_action_schedules * 4)
+            + (self.contingency_power_flow_results * (1 + contingency_fields_attempted))
+            + (self.remedial_action_schedules * (2 + contingency_fields_attempted))
         )
         return fields_attempted - self.fields_enriched
 
+    def incremented(self, **increments: int) -> EnrichmentStats:
+        values = {field_name: getattr(self, field_name) for field_name in self.__dataclass_fields__}
+        for field_name, increment in increments.items():
+            values[field_name] += increment
+        return replace(self, **values)
+
 
 class CardDataEnricher:
+    CONTINGENCY_FIELD_ENRICHMENTS = (
+        ContingencyFieldEnrichment("name", "ContingencyName", "contingency_names_added", "name"),
+        ContingencyFieldEnrichment("@type", "ContingencyType", "contingency_types_added", "type"),
+        ContingencyFieldEnrichment("EquipmentOperator", "ContingencyOperatorEIC", "contingency_operator_eic_added", "operator"),
+    )
+
     CONTINGENCY_MATCH_FIELDS = (
         "@id",
         "mRID",
@@ -99,23 +121,20 @@ class CardDataEnricher:
                 proposed_by_names_added=stats.proposed_by_names_added,
                 contingency_names_added=stats.contingency_names_added,
                 contingency_types_added=stats.contingency_types_added,
-                contingency_operator_added=stats.contingency_operator_added,
+                contingency_operator_eic_added=stats.contingency_operator_eic_added,
             )
         return stats
 
     def _enrich_contingency_power_flow_results(self, payload: dict[str, Any], stats: EnrichmentStats) -> EnrichmentStats:
         for result in self._section_items(payload, "ContingencyPowerFlowResult"):
             area_added = self._add_area_name(result, "ReportedByRegion")
-            contingency_name_added, contingency_type_added, contingency_operator_added = self._add_contingency_fields(result)
-            stats = EnrichmentStats(
-                base_case_power_flow_results=stats.base_case_power_flow_results,
-                contingency_power_flow_results=stats.contingency_power_flow_results + 1,
-                remedial_action_schedules=stats.remedial_action_schedules,
-                area_names_added=stats.area_names_added + int(area_added),
-                proposed_by_names_added=stats.proposed_by_names_added,
-                contingency_names_added=stats.contingency_names_added + int(contingency_name_added),
-                contingency_types_added=stats.contingency_types_added + int(contingency_type_added),
-                contingency_operator_added=stats.contingency_operator_added + int(contingency_operator_added)
+            contingency_fields_added = self._add_contingency_fields(result)
+            stats = self._increment_stats_with_contingency_fields(
+                stats.incremented(
+                    contingency_power_flow_results=1,
+                    area_names_added=int(area_added),
+                ),
+                contingency_fields_added,
             )
         return stats
 
@@ -123,16 +142,14 @@ class CardDataEnricher:
         for schedule in self._section_items(payload, "RemedialActionSchedule"):
             area_added = self._add_area_name(schedule, "AssignedRegion")
             proposed_by_added = self._add_proposed_by_name(schedule)
-            contingency_name_added, contingency_type_added, contingency_operator_added = self._add_contingency_fields(schedule)
-            stats = EnrichmentStats(
-                base_case_power_flow_results=stats.base_case_power_flow_results,
-                contingency_power_flow_results=stats.contingency_power_flow_results,
-                remedial_action_schedules=stats.remedial_action_schedules + 1,
-                area_names_added=stats.area_names_added + int(area_added),
-                proposed_by_names_added=stats.proposed_by_names_added + int(proposed_by_added),
-                contingency_names_added=stats.contingency_names_added + int(contingency_name_added),
-                contingency_types_added=stats.contingency_types_added + int(contingency_type_added),
-                contingency_operator_added=stats.contingency_operator_added + int(contingency_operator_added)
+            contingency_fields_added = self._add_contingency_fields(schedule)
+            stats = self._increment_stats_with_contingency_fields(
+                stats.incremented(
+                    remedial_action_schedules=1,
+                    area_names_added=int(area_added),
+                    proposed_by_names_added=int(proposed_by_added),
+                ),
+                contingency_fields_added,
             )
         return stats
 
@@ -164,41 +181,33 @@ class CardDataEnricher:
         self._log_field_enriched(item, "ProposedByName", party_name)
         return True
 
-    def _add_contingency_fields(self, item: dict[str, Any]) -> tuple[bool, bool, bool]:
+    def _add_contingency_fields(self, item: dict[str, Any]) -> dict[str, bool]:
+        fields_added = {field.output_key: False for field in self.CONTINGENCY_FIELD_ENRICHMENTS}
         contingency_id = self._normalize_identifier_reference(item.get("Contingency"))
         if not contingency_id:
             self._handle_missing(f"Missing Contingency in item {item.get('@id')}")
-            return False, False, False
+            return fields_added
         contingency = self._get_contingency_by_identifier(contingency_id)
         if not contingency:
             self._handle_missing(f"No contingency document found for identifier {contingency_id}")
-            return False, False, False
+            return fields_added
 
-        contingency_name = self._get_path(contingency, "name")
-        contingency_type = self._get_path(contingency, "@type")
-        contingency_operator = self._get_path(contingency, "EquipmentOperator")
-        name_added = False
-        type_added = False
-        co_operator_added = False
-        if contingency_name:
-            item["ContingencyName"] = contingency_name
-            self._log_field_enriched(item, "ContingencyName", contingency_name)
-            name_added = True
-        else:
-            self._handle_missing(f"No contingency name found for identifier {contingency_id}")
-        if contingency_type:
-            item["ContingencyType"] = contingency_type
-            self._log_field_enriched(item, "ContingencyType", contingency_type)
-            type_added = True
-        else:
-            self._handle_missing(f"No contingency type found for identifier {contingency_id}")
-        if contingency_operator:
-            item["ContingencyOperator"] = contingency_operator
-            self._log_field_enriched(item, "ContingencyOperator", contingency_operator)
-            co_operator_added = True
-        else:
-            self._handle_missing(f"No contingency operator found for identifier {contingency_id}")
-        return name_added, type_added, co_operator_added
+        for field in self.CONTINGENCY_FIELD_ENRICHMENTS:
+            value = self._get_path(contingency, field.source_path)
+            if value:
+                item[field.output_key] = value
+                self._log_field_enriched(item, field.output_key, value)
+                fields_added[field.output_key] = True
+            else:
+                self._handle_missing(f"No contingency {field.missing_label} found for identifier {contingency_id}")
+        return fields_added
+
+    def _increment_stats_with_contingency_fields(self, stats: EnrichmentStats, fields_added: dict[str, bool]) -> EnrichmentStats:
+        increments = {
+            field.stats_key: int(fields_added[field.output_key])
+            for field in self.CONTINGENCY_FIELD_ENRICHMENTS
+        }
+        return stats.incremented(**increments)
 
     def _get_area_by_eic(self, eic: str) -> dict[str, Any] | None:
         if eic not in self._area_by_eic:
@@ -358,8 +367,8 @@ if __name__ == "__main__":
     from card_publicator.rdf_converter import convert_cim_rdf_to_json
 
     def enrich_nc_xml_file(
-        input_path: str = r"C:\Users\lukas.navickas\Documents\Opcoord_testing\example_cards\test_ras_1.xml",
-        output_path: str = r"C:\Users\lukas.navickas\Documents\Opcoord_testing\enriched_cards\enriched_card_ras_test_1.json",
+        input_path: str = r"C:\Users\lukas.navickas\Documents\Opcoord_testing\example_cards\SAR_20260425T0230_1D_1.xml",
+        output_path: str = r"C:\Users\lukas.navickas\Documents\Opcoord_testing\enriched_cards\enriched_card_sar_test_1.json",
         strict: bool = False, # If strict = True, return ValueError for missing enrichment fields and fails
         debug: bool = True, # enable extended warning logs
         indent: int = 2,
