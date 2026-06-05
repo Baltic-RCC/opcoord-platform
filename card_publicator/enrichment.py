@@ -82,7 +82,7 @@ class CardDataEnricher:
     def _enrich_remedial_action_schedules(self, payload: dict[str, Any]) -> None:
         for schedule in self._section_items(payload, "RemedialActionSchedule"):
             self._add_area_name(schedule, "AssignedRegion")
-            self._add_proposed_by_name(schedule)
+            self._add_proposed_by_name(schedule, "ProposingEntity")
             self._add_contingency_fields(schedule)
 
     def _add_area_name(self, item: dict[str, Any], source_key: str) -> None:
@@ -98,10 +98,10 @@ class CardDataEnricher:
         item["AreaName"] = area_name
         self._log_field_enriched(item, "AreaName", area_name)
 
-    def _add_proposed_by_name(self, item: dict[str, Any]) -> None:
-        party_eic = self._normalize_eic_reference(item.get("ProposingEntity"))
+    def _add_proposed_by_name(self, item: dict[str, Any], source_key: str) -> None:
+        party_eic = self._normalize_eic_reference(item.get(source_key))
         if not party_eic:
-            self._handle_missing_field(item, "ProposedByName", "missing ProposingEntity")
+            self._handle_missing_field(item, "ProposedByName", f"missing {source_key}")
             return
         party = self._get_party_by_eic(party_eic)
         party_name = self._get_path(party, "party.name") if party else None
