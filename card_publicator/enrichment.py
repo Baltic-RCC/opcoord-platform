@@ -31,13 +31,7 @@ class CardDataEnricher:
 
     CONTINGENCY_OPERATOR_NAME_OUTPUT_KEY = "ContingencyOperatorName"
 
-    CONTINGENCY_MATCH_FIELDS = (
-        "@id",
-        "mRID",
-        "ContingencyEquipment.Contingency",
-        "ContingencyEquipment.mRID",
-        "ContingencyEquipment.@id",
-    )
+    CONTINGENCY_MATCH_FIELD = "ContingencyEquipment.Contingency"
 
     def __init__(
         self,
@@ -86,7 +80,7 @@ class CardDataEnricher:
             self._add_contingency_fields(schedule)
 
     def _add_area_name(self, item: dict[str, Any], source_key: str) -> None:
-        area_eic = self._normalize_eic_reference(item.get(source_key))
+        area_eic = item.get(source_key)
         if not area_eic:
             self._handle_missing_field(item, "AreaName", f"missing {source_key}")
             return
@@ -99,7 +93,7 @@ class CardDataEnricher:
         self._log_field_enriched(item, "AreaName", area_name)
 
     def _add_proposed_by_name(self, item: dict[str, Any], source_key: str) -> None:
-        party_eic = self._normalize_eic_reference(item.get(source_key))
+        party_eic = item.get("ProposingEntity")
         if not party_eic:
             self._handle_missing_field(item, "ProposedByName", f"missing {source_key}")
             return
@@ -112,13 +106,13 @@ class CardDataEnricher:
         self._log_field_enriched(item, "ProposedByName", party_name)
 
     def _add_contingency_fields(self, item: dict[str, Any]) -> None:
-        contingency_id = self._normalize_identifier_reference(item.get("Contingency"))
+        contingency_id = item.get("Contingency")
         if not contingency_id:
             self._handle_missing_contingency_fields(item, "missing Contingency")
             return
         contingency = self._get_contingency_by_identifier(contingency_id)
         if not contingency:
-            self._handle_missing_contingency_fields(item,f"no contingency document found for identifier {contingency_id}",)
+            self._handle_missing_contingency_fields(item,f"no contingency document found for identifier {contingency_id}")
             return
 
         for field in self.CONTINGENCY_FIELD_ENRICHMENTS:
@@ -134,15 +128,14 @@ class CardDataEnricher:
                 if field.output_key == "ContingencyOperatorEIC":
                     self._handle_missing_field(item, self.CONTINGENCY_OPERATOR_NAME_OUTPUT_KEY, reason)
 
-    def _add_contingency_operator_name(self, item: dict[str, Any], operator_eic_reference: Any) -> None:
-        party_eic = self._normalize_eic_reference(operator_eic_reference)
-        if not party_eic:
-            self._handle_missing_field(item, self.CONTINGENCY_OPERATOR_NAME_OUTPUT_KEY,f"invalid contingency operator EIC reference {operator_eic_reference}")
+    def _add_contingency_operator_name(self, item: dict[str, Any], operator_eic: Any) -> None:
+        if not operator_eic:
+            self._handle_missing_field(item, self.CONTINGENCY_OPERATOR_NAME_OUTPUT_KEY,f"missing contingency operator EIC {operator_eic}")
             return
-        party = self._get_party_by_eic(party_eic)
+        party = self._get_party_by_eic(operator_eic)
         party_name = self._get_path(party, "party.name") if party else None
         if not party_name:
-            self._handle_missing_field(item, self.CONTINGENCY_OPERATOR_NAME_OUTPUT_KEY,f"no party.name found for party EIC {party_eic}")
+            self._handle_missing_field(item, self.CONTINGENCY_OPERATOR_NAME_OUTPUT_KEY,f"no party.name found for party EIC {operator_eic}",)
             return
         item[self.CONTINGENCY_OPERATOR_NAME_OUTPUT_KEY] = party_name
         self._log_field_enriched(item, self.CONTINGENCY_OPERATOR_NAME_OUTPUT_KEY, party_name)
@@ -163,18 +156,9 @@ class CardDataEnricher:
         return self._party_by_eic[eic]
 
     def _get_contingency_by_identifier(self, identifier: str) -> dict[str, Any] | None:
-        if identifier in self._contingency_by_identifier:
-            return self._contingency_by_identifier[identifier]
-
-        variants = self._identifier_variants(identifier)
-        for field in self.CONTINGENCY_MATCH_FIELDS:
-            for variant in variants:
-                doc = self._get_first_doc_by_exact_field(self.contingencies_index, field, variant)
-                if doc:
-                    self._contingency_by_identifier[identifier] = doc
-                    return doc
-        self._contingency_by_identifier[identifier] = None
-        return None
+        if identifier not in self._contingency_by_identifier:
+            self._contingency_by_identifier[identifier] = self._get_first_doc_by_exact_field(self.contingencies_index, self.CONTINGENCY_MATCH_FIELD, identifier)
+        return self._contingency_by_identifier[identifier]
 
     def _get_first_doc_by_exact_field(self, index: str, field: str, value: str) -> dict[str, Any] | None:
         query = {
@@ -217,6 +201,7 @@ class CardDataEnricher:
     def _profile_type(self, payload: dict[str, Any]) -> NCProfileType:
         return self._validated_profile_type_from_full_model(payload)
 
+    '''Determine what profile type is being enriched according to NC profile structure via matching keyword'''
     @staticmethod
     def _validated_profile_type_from_full_model(payload: dict[str, Any]) -> NCProfileType:
         for full_model in CardDataEnricher._section_items(payload, "FullModel"):
@@ -253,37 +238,6 @@ class CardDataEnricher:
         return []
 
     @staticmethod
-    def _normalize_eic_reference(value: Any) -> str | None:
-        if value is None:
-            return None
-        normalized = str(value).strip()
-        if not normalized:
-            return None
-        if "/" in normalized:
-            normalized = normalized.rsplit("/", 1)[-1]
-        if "#" in normalized:
-            normalized = normalized.rsplit("#", 1)[-1]
-        return normalized or None
-
-    @staticmethod
-    def _normalize_identifier_reference(value: Any) -> str | None:
-        if value is None:
-            return None
-        normalized = str(value).strip()
-        if not normalized:
-            return None
-        if normalized.startswith("#"):
-            normalized = normalized[1:]
-        return normalized or None
-
-    @staticmethod
-    def _identifier_variants(identifier: str) -> list[str]:
-        stripped = identifier[1:] if identifier.startswith("_") else identifier
-        with_underscore = f"_{stripped}"
-        variants = [identifier, with_underscore, stripped]
-        return list(dict.fromkeys(value for value in variants if value))
-
-    @staticmethod
     def _get_path(document: dict[str, Any] | None, path: str) -> Any:
         if not document:
             return None
@@ -313,8 +267,8 @@ if __name__ == "__main__":
     def enrich_nc_xml_file(
         input_path: str = r"C:\Users\lukas.navickas\Documents\Opcoord_testing\example_cards\test_ras_1.xml",
         output_path: str = r"C:\Users\lukas.navickas\Documents\Opcoord_testing\enriched_cards\enriched_card_ras_1.json",
-        strict: bool = False, # If strict = True, return ValueError for missing enrichment fields and fails
-        debug: bool = True, # enable extended warning logs
+        strict: bool = False,  # If strict = True, return ValueError for missing enrichment fields and fails
+        debug: bool = True,  # enable extended warning logs
         indent: int = 2,
     ) -> dict[str, Any]:
         # This local helper is only for manual testing. Production code should use
