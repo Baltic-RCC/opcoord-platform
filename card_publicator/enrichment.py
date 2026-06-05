@@ -34,6 +34,7 @@ class EnrichmentStats:
     contingency_names_added: int = 0
     contingency_types_added: int = 0
     contingency_operator_eic_added: int = 0
+    contingency_operator_names_added: int = 0
 
     @property
     def fields_enriched(self) -> int:
@@ -43,11 +44,12 @@ class EnrichmentStats:
             + self.contingency_names_added
             + self.contingency_types_added
             + self.contingency_operator_eic_added
+            + self.contingency_operator_names_added
         )
 
     @property
     def fields_failed(self) -> int:
-        contingency_fields_attempted = len(CardDataEnricher.CONTINGENCY_FIELD_ENRICHMENTS)
+        contingency_fields_attempted = len(CardDataEnricher.CONTINGENCY_FIELD_ENRICHMENTS) + 1
         fields_attempted = (
             self.base_case_power_flow_results
             + (self.contingency_power_flow_results * (1 + contingency_fields_attempted))
@@ -68,6 +70,8 @@ class CardDataEnricher:
         ContingencyFieldEnrichment("@type", "ContingencyType", "contingency_types_added", "type"),
         ContingencyFieldEnrichment("EquipmentOperator", "ContingencyOperatorEIC", "contingency_operator_eic_added", "operator"),
     )
+
+    CONTINGENCY_OPERATOR_NAME_OUTPUT_KEY = "ContingencyOperatorName"
 
     CONTINGENCY_MATCH_FIELDS = (
         "@id",
@@ -122,6 +126,7 @@ class CardDataEnricher:
                 contingency_names_added=stats.contingency_names_added,
                 contingency_types_added=stats.contingency_types_added,
                 contingency_operator_eic_added=stats.contingency_operator_eic_added,
+                contingency_operator_names_added=stats.contingency_operator_names_added,
             )
         return stats
 
@@ -183,6 +188,7 @@ class CardDataEnricher:
 
     def _add_contingency_fields(self, item: dict[str, Any]) -> dict[str, bool]:
         fields_added = {field.output_key: False for field in self.CONTINGENCY_FIELD_ENRICHMENTS}
+        fields_added[self.CONTINGENCY_OPERATOR_NAME_OUTPUT_KEY] = False
         contingency_id = self._normalize_identifier_reference(item.get("Contingency"))
         if not contingency_id:
             self._handle_missing(f"Missing Contingency in item {item.get('@id')}")
@@ -198,6 +204,16 @@ class CardDataEnricher:
                 item[field.output_key] = value
                 self._log_field_enriched(item, field.output_key, value)
                 fields_added[field.output_key] = True
+                if field.output_key == "ContingencyOperatorEIC":
+                    party_eic = self._normalize_eic_reference(value)
+                    party = self._get_party_by_eic(party_eic) if party_eic else None
+                    party_name = self._get_path(party, "party.name") if party else None
+                    if party_name:
+                        item[self.CONTINGENCY_OPERATOR_NAME_OUTPUT_KEY] = party_name
+                        self._log_field_enriched(item, self.CONTINGENCY_OPERATOR_NAME_OUTPUT_KEY, party_name)
+                        fields_added[self.CONTINGENCY_OPERATOR_NAME_OUTPUT_KEY] = True
+                    else:
+                        self._handle_missing(f"No party.name found for party EIC {party_eic}")
             else:
                 self._handle_missing(f"No contingency {field.missing_label} found for identifier {contingency_id}")
         return fields_added
@@ -207,6 +223,7 @@ class CardDataEnricher:
             field.stats_key: int(fields_added[field.output_key])
             for field in self.CONTINGENCY_FIELD_ENRICHMENTS
         }
+        increments["contingency_operator_names_added"] = int(fields_added[self.CONTINGENCY_OPERATOR_NAME_OUTPUT_KEY])
         return stats.incremented(**increments)
 
     def _get_area_by_eic(self, eic: str) -> dict[str, Any] | None:
@@ -367,8 +384,8 @@ if __name__ == "__main__":
     from card_publicator.rdf_converter import convert_cim_rdf_to_json
 
     def enrich_nc_xml_file(
-        input_path: str = r"C:\Users\lukas.navickas\Documents\Opcoord_testing\example_cards\SAR_20260425T0230_1D_1.xml",
-        output_path: str = r"C:\Users\lukas.navickas\Documents\Opcoord_testing\enriched_cards\enriched_card_sar_test_1.json",
+        input_path: str = r"C:\Users\lukas.navickas\Documents\Opcoord_testing\example_cards\SAR_20260520T1130_ID_1.xml",
+        output_path: str = r"C:\Users\lukas.navickas\Documents\Opcoord_testing\enriched_cards\enriched_card_sar_ID.json",
         strict: bool = False, # If strict = True, return ValueError for missing enrichment fields and fails
         debug: bool = True, # enable extended warning logs
         indent: int = 2,
