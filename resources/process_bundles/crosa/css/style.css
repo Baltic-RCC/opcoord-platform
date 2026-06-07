@@ -1,9 +1,11 @@
+/* Root card container */
 .cq {
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
   padding: 14px 16px;
   max-width: 1200px;
 }
 
+/* Shared section layout */
 .cq-section { margin-top: 10px; }
 .cq-section-title {
   font-weight: 700;
@@ -11,18 +13,90 @@
   opacity: 0.95;
 }
 
+/* Metadata grid used by the card and SAR metadata sections */
+.cq-meta-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 8px 18px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.025);
+}
+
+/* One metadata label/value pair */
+.cq-meta-item {
+  min-width: 0;
+}
+
+/* Metadata label */
+.cq-meta-item dt {
+  margin: 0 0 3px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  opacity: 0.68;
+}
+
+/* Metadata value */
+.cq-meta-item dd {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+/* Compact stats shown above detailed result tables */
+.cq-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, max-content));
+  gap: 8px 12px;
+  margin: 0 0 10px;
+  padding: 0;
+}
+
+/* One stat label/value pair */
+.cq-stat-item {
+  min-width: 160px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.025);
+}
+
+/* Stat label */
+.cq-stat-item dt {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  opacity: 0.68;
+}
+
+/* Stat value */
+.cq-stat-item dd {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+/* Framed table container */
 .cq-table-wrap {
   border-radius: 10px;
   overflow: hidden;
   border: 1px solid rgba(255,255,255,0.08);
 }
 
+/* Power-flow results table */
 .cq-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
 }
 
+/* Table header cells */
 .cq-table thead th {
   text-align: left;
   padding: 10px 12px;
@@ -31,21 +105,25 @@
   font-weight: 700;
 }
 
+/* Table body cells */
 .cq-table tbody td {
   padding: 9px 12px;
   border-bottom: 1px solid rgba(255,255,255,0.06);
   vertical-align: middle;
 }
 
+/* Subtle row hover state */
 .cq-table tbody tr:hover td {
   background: rgba(255,255,255,0.03);
 }
 
+/* Technical identifiers and values */
 .cq-mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   word-break: break-word;
 }
 
+/* Small inline value badge */
 .cq-pill {
   display: inline-block;
   padding: 2px 8px;
@@ -55,18 +133,21 @@
   line-height: 18px;
 }
 
+/* Alert variant for violation or over-limit values */
 .cq-pill-bad {
   border-color: rgba(255, 80, 80, 0.35);
   background: rgba(255, 80, 80, 0.12);
 }
 
+/* Whole-row highlight for contingency violations */
 .cq-row-violation td {
   background: rgba(255, 80, 80, 0.06);
 }
 
+/* Less prominent fallback text */
 .cq-muted { opacity: 0.7; }
 
-/* show dash when base-case match is missing */
+/* Show dash when base-case match is missing */
 .cq-empty:empty::before {
   content: "—";
   opacity: 0.65;
