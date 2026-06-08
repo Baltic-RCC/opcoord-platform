@@ -97,6 +97,7 @@ class CardDataEnricher:
             self._add_area_name(schedule, "AssignedRegion")
             self._add_proposed_by_name(schedule, "ProposingEntity")
             self._add_contingency_fields(schedule)
+            self._add_remedial_action_fields(schedule)
 
     def _add_area_name(self, item: dict[str, Any], source_key: str) -> None:
         area_eic = item.get(source_key)
@@ -163,6 +164,46 @@ class CardDataEnricher:
         for field in self.CONTINGENCY_FIELD_ENRICHMENTS:
             self._handle_missing_field(item, field.output_key, reason)
         self._handle_missing_field(item, self.CONTINGENCY_OPERATOR_NAME_OUTPUT_KEY, reason)
+
+    def _add_remedial_action_fields(self, item: dict[str, Any]) -> None:
+        remedial_action_id = item.get("RemedialAction")
+        if not remedial_action_id:
+            self._handle_missing_remedial_action_fields(item, "missing RemedialAction")
+            return
+        remedial_action = self._get_remedial_action_by_identifier(remedial_action_id)
+        if not remedial_action:
+            self._handle_missing_remedial_action_fields(item, f"no remedial action document found for identifier {remedial_action_id}")
+            return
+
+        for field in self.REMEDIAL_ACTION_FIELD_ENRICHMENTS:
+            value = self._get_path(remedial_action, field.source_path)
+            if value:
+                item[field.output_key] = value
+                self._log_field_enriched(item, field.output_key, value)
+                if field.output_key == "RemedialActionOperatorEIC":
+                    self._add_remedial_action_operator_name(item, value)
+            else:
+                reason = f"no remedial action {field.missing_label} found for identifier {remedial_action_id}"
+                self._handle_missing_field(item, field.output_key, reason)
+                if field.output_key == "RemedialActionOperatorEIC":
+                    self._handle_missing_field(item, self.REMEDIAL_ACTION_OPERATOR_NAME_OUTPUT_KEY, reason)
+
+    def _add_remedial_action_operator_name(self, item: dict[str, Any], operator_eic: Any) -> None:
+        if not operator_eic:
+            self._handle_missing_field(item, self.REMEDIAL_ACTION_OPERATOR_NAME_OUTPUT_KEY, f"missing remedial action operator EIC {operator_eic}")
+            return
+        party = self._get_party_by_eic(operator_eic)
+        party_name = self._get_path(party, "party.name") if party else None
+        if not party_name:
+            self._handle_missing_field(item, self.REMEDIAL_ACTION_OPERATOR_NAME_OUTPUT_KEY,f"no party.name found for party EIC {operator_eic}")
+            return
+        item[self.REMEDIAL_ACTION_OPERATOR_NAME_OUTPUT_KEY] = party_name
+        self._log_field_enriched(item, self.REMEDIAL_ACTION_OPERATOR_NAME_OUTPUT_KEY, party_name)
+
+    def _handle_missing_remedial_action_fields(self, item: dict[str, Any], reason: str) -> None:
+        for field in self.REMEDIAL_ACTION_FIELD_ENRICHMENTS:
+            self._handle_missing_field(item, field.output_key, reason)
+        self._handle_missing_field(item, self.REMEDIAL_ACTION_OPERATOR_NAME_OUTPUT_KEY, reason)
 
     def _get_area_by_eic(self, eic: str) -> dict[str, Any] | None:
         if eic not in self._area_by_eic:
@@ -289,8 +330,8 @@ if __name__ == "__main__":
     from card_publicator.rdf_converter import convert_cim_rdf_to_json
 
     def enrich_nc_xml_file(
-        input_path: str = r"C:\Users\lukas.navickas\Documents\Opcoord_testing\example_cards\test_ras_1.xml",
-        output_path: str = r"C:\Users\lukas.navickas\Documents\Opcoord_testing\enriched_cards\enriched_card_ras_1.json",
+        input_path: str = r"C:\Users\lukas.navickas\Documents\Opcoord_testing\example_cards\test_ras_2.xml",
+        output_path: str = r"C:\Users\lukas.navickas\Documents\Opcoord_testing\enriched_cards\enriched_card_ras_2.json",
         strict: bool = False,  # If strict = True, return ValueError for missing enrichment fields and fails
         debug: bool = True,  # enable extended warning logs
         indent: int = 2,
@@ -318,6 +359,7 @@ if __name__ == "__main__":
             elastic=Elastic(debug=debug),
             areas_index=DEFAULT_AREAS_INDEX,
             contingencies_index=DEFAULT_CONTINGENCIES_INDEX,
+            remedial_actions_index=DEFAULT_REMEDIAL_ACTIONS_INDEX,
             strict=strict,
             debug=debug,
         )
