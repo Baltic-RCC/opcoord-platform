@@ -8,6 +8,15 @@ from loguru import logger
 
 from integrations.elastic import Elastic
 
+"""Card enrichment helpers for adding human-readable metadata to NC cards.
+
+Workflow overview:
+    * Detect the NC profile type from the FullModel keyword (RAS or SAR).
+    * Walk the profile-specific card sections that need enrichment.
+    * Resolve referenced area, party, contingency, and remedial-action documents from Elastic.
+    * Copy configured source fields into the card payload and add operator/area display names.
+    * Log or raise on missing enrichment data depending on strict mode.
+"""
 
 DEFAULT_AREAS_INDEX = "config-areas"
 DEFAULT_CONTINGENCIES_INDEX = "csa-contingencies-*"
@@ -18,17 +27,22 @@ NCProfileType = Literal["RAS", "SAR"]
 
 @dataclass(frozen=True)
 class ContingencyFieldEnrichment:
+    """Maps one contingency document field to the card output field to enrich."""
     source_path: str
     output_key: str
     missing_label: str
+
 
 @dataclass(frozen=True)
 class RemedialActionFieldEnrichment:
+    """Maps one remedial-action document field to the card output field to enrich."""
     source_path: str
     output_key: str
     missing_label: str
 
+
 class CardDataEnricher:
+    """Enriches converted NC card payloads with names and metadata from Elastic."""
     CONTINGENCY_FIELD_ENRICHMENTS = (
         ContingencyFieldEnrichment("name", "ContingencyName", "name"),
         ContingencyFieldEnrichment("@type", "ContingencyType", "type"),
@@ -58,6 +72,7 @@ class CardDataEnricher:
         strict: bool = False,
         debug: bool = False,
     ):
+        """Store Elastic/index settings and initialize per-run lookup caches."""
         self.elastic = elastic
         self.areas_index = areas_index
         self.contingencies_index = contingencies_index
@@ -70,10 +85,12 @@ class CardDataEnricher:
         self._remedial_action_by_identifier: dict[str, dict[str, Any] | None] = {}
 
     def enrich(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Enrich a payload in place and return the same payload for fluent callers."""
         self.enrich_in_place(payload)
         return payload
 
     def enrich_in_place(self, payload: dict[str, Any]) -> None:
+        """Dispatch enrichment to the workflow that matches the detected NC profile."""
         profile_type = self._profile_type(payload)
         logger.info(f"Enriching {profile_type} profile")
         if profile_type == "RAS":
@@ -84,15 +101,18 @@ class CardDataEnricher:
         logger.success(f"Enriched {profile_type} successfully")
 
     def _enrich_base_case_power_flow_results(self, payload: dict[str, Any]) -> None:
+        """Add reported area names to SAR base-case power-flow results."""
         for result in self._section_items(payload, "BaseCasePowerFlowResult"):
             self._add_area_name(result, "ReportedByRegion")
 
     def _enrich_contingency_power_flow_results(self, payload: dict[str, Any]) -> None:
+        """Add reported area and contingency details to SAR contingency results."""
         for result in self._section_items(payload, "ContingencyPowerFlowResult"):
             self._add_area_name(result, "ReportedByRegion")
             self._add_contingency_fields(result)
 
     def _enrich_remedial_action_schedules(self, payload: dict[str, Any]) -> None:
+        """Add area, proposer, contingency, and action details to RAS schedules."""
         for schedule in self._section_items(payload, "RemedialActionSchedule"):
             self._add_area_name(schedule, "AssignedRegion")
             self._add_proposed_by_name(schedule, "ProposingEntity")
@@ -100,6 +120,7 @@ class CardDataEnricher:
             self._add_remedial_action_fields(schedule)
 
     def _add_area_name(self, item: dict[str, Any], source_key: str) -> None:
+        """Resolve an area EIC from an item and write the display AreaName."""
         area_eic = item.get(source_key)
         if not area_eic:
             self._handle_missing_field(item, "AreaName", f"missing {source_key}")
@@ -113,6 +134,7 @@ class CardDataEnricher:
         self._log_field_enriched(item, "AreaName", area_name)
 
     def _add_proposed_by_name(self, item: dict[str, Any], source_key: str) -> None:
+        """Resolve the proposing party EIC and write the display ProposedByName."""
         party_eic = item.get("ProposingEntity")
         if not party_eic:
             self._handle_missing_field(item, "ProposedByName", f"missing {source_key}")
@@ -126,6 +148,7 @@ class CardDataEnricher:
         self._log_field_enriched(item, "ProposedByName", party_name)
 
     def _add_contingency_fields(self, item: dict[str, Any]) -> None:
+        """Look up the referenced contingency and copy configured fields onto an item."""
         contingency_id = item.get("Contingency")
         if not contingency_id:
             self._handle_missing_contingency_fields(item, "missing Contingency")
@@ -149,6 +172,7 @@ class CardDataEnricher:
                     self._handle_missing_field(item, self.CONTINGENCY_OPERATOR_NAME_OUTPUT_KEY, reason)
 
     def _add_contingency_operator_name(self, item: dict[str, Any], operator_eic: Any) -> None:
+        """Resolve a contingency operator EIC and write ContingencyOperatorName."""
         if not operator_eic:
             self._handle_missing_field(item, self.CONTINGENCY_OPERATOR_NAME_OUTPUT_KEY,f"missing contingency operator EIC {operator_eic}")
             return
@@ -161,11 +185,13 @@ class CardDataEnricher:
         self._log_field_enriched(item, self.CONTINGENCY_OPERATOR_NAME_OUTPUT_KEY, party_name)
 
     def _handle_missing_contingency_fields(self, item: dict[str, Any], reason: str) -> None:
+        """Apply missing-field handling to every contingency enrichment output."""
         for field in self.CONTINGENCY_FIELD_ENRICHMENTS:
             self._handle_missing_field(item, field.output_key, reason)
         self._handle_missing_field(item, self.CONTINGENCY_OPERATOR_NAME_OUTPUT_KEY, reason)
 
     def _add_remedial_action_fields(self, item: dict[str, Any]) -> None:
+        """Look up the referenced remedial action and copy configured fields."""
         remedial_action_id = item.get("RemedialAction")
         if not remedial_action_id:
             self._handle_missing_remedial_action_fields(item, "missing RemedialAction")
@@ -189,6 +215,7 @@ class CardDataEnricher:
                     self._handle_missing_field(item, self.REMEDIAL_ACTION_OPERATOR_NAME_OUTPUT_KEY, reason)
 
     def _add_remedial_action_operator_name(self, item: dict[str, Any], operator_eic: Any) -> None:
+        """Resolve a remedial-action operator EIC and write its display name."""
         if not operator_eic:
             self._handle_missing_field(item, self.REMEDIAL_ACTION_OPERATOR_NAME_OUTPUT_KEY, f"missing remedial action operator EIC {operator_eic}")
             return
@@ -201,31 +228,37 @@ class CardDataEnricher:
         self._log_field_enriched(item, self.REMEDIAL_ACTION_OPERATOR_NAME_OUTPUT_KEY, party_name)
 
     def _handle_missing_remedial_action_fields(self, item: dict[str, Any], reason: str) -> None:
+        """Apply missing-field handling to every remedial-action output."""
         for field in self.REMEDIAL_ACTION_FIELD_ENRICHMENTS:
             self._handle_missing_field(item, field.output_key, reason)
         self._handle_missing_field(item, self.REMEDIAL_ACTION_OPERATOR_NAME_OUTPUT_KEY, reason)
 
     def _get_area_by_eic(self, eic: str) -> dict[str, Any] | None:
+        """Return an area document by EIC, using a local cache to avoid repeat queries."""
         if eic not in self._area_by_eic:
             self._area_by_eic[eic] = self._get_first_doc_by_exact_field(self.areas_index, "area.eic", eic)
         return self._area_by_eic[eic]
 
     def _get_party_by_eic(self, eic: str) -> dict[str, Any] | None:
+        """Return a party document by EIC, using a local cache to avoid repeat queries."""
         if eic not in self._party_by_eic:
             self._party_by_eic[eic] = self._get_first_doc_by_exact_field(self.areas_index, "party.eic", eic)
         return self._party_by_eic[eic]
 
     def _get_contingency_by_identifier(self, identifier: str) -> dict[str, Any] | None:
+        """Return a contingency document by card identifier, caching the result."""
         if identifier not in self._contingency_by_identifier:
             self._contingency_by_identifier[identifier] = self._get_first_doc_by_exact_field(self.contingencies_index, self.CONTINGENCY_MATCH_FIELD, identifier)
         return self._contingency_by_identifier[identifier]
 
     def _get_remedial_action_by_identifier(self, identifier: str) -> dict[str, Any] | None:
+        """Return a remedial-action document by identifier, caching the result."""
         if identifier not in self._remedial_action_by_identifier:
             self._remedial_action_by_identifier[identifier] = self._get_first_doc_by_exact_field(self.remedial_actions_index, self.REMEDIAL_ACTION_MATCH_FIELD, identifier)
         return self._remedial_action_by_identifier[identifier]
 
     def _get_first_doc_by_exact_field(self, index: str, field: str, value: str) -> dict[str, Any] | None:
+        """Query Elastic for the first document matching an exact field value."""
         query = {
             "bool": {
                 "should": [
@@ -243,6 +276,7 @@ class CardDataEnricher:
 
     @staticmethod
     def _extract_source_docs(response: Any) -> list[dict[str, Any]]:
+        """Normalize common Elastic/DataFrame response shapes into source documents."""
         if response is None:
             return []
         if isinstance(response, dict):
@@ -264,11 +298,12 @@ class CardDataEnricher:
         return []
 
     def _profile_type(self, payload: dict[str, Any]) -> NCProfileType:
+        """Determine the payload profile type through the validated FullModel path."""
         return self._validated_profile_type_from_full_model(payload)
 
-    '''Determine what profile type is being enriched according to NC profile structure via matching keyword'''
     @staticmethod
     def _validated_profile_type_from_full_model(payload: dict[str, Any]) -> NCProfileType:
+        """Read FullModel.keyword and validate it as a supported RAS or SAR type."""
         for full_model in CardDataEnricher._section_items(payload, "FullModel"):
             keyword = full_model.get("keyword")
             if isinstance(keyword, list):
@@ -284,17 +319,20 @@ class CardDataEnricher:
 
     @staticmethod
     def _normalize_profile_keyword(value: Any) -> str | None:
+        """Convert a profile keyword value to uppercase text or None if blank."""
         if value is None:
             return None
         normalized = str(value).strip().upper()
         return normalized or None
 
     def _log_field_enriched(self, item: dict[str, Any], field_name: str, value: Any) -> None:
+        """Emit a debug log for one enriched field when debug logging is enabled."""
         if self.debug:
             logger.debug(f"Enriched {field_name} for item {item.get('@id')}: {value}")
 
     @staticmethod
     def _section_items(payload: dict[str, Any], section_name: str) -> list[dict[str, Any]]:
+        """Return a section as a list of item dictionaries regardless of input shape."""
         section = payload.get(section_name)
         if isinstance(section, dict):
             return [section]
@@ -304,6 +342,7 @@ class CardDataEnricher:
 
     @staticmethod
     def _get_path(document: dict[str, Any] | None, path: str) -> Any:
+        """Read a dotted path from nested dictionaries, with list-first-item support."""
         if not document:
             return None
         if path in document:
@@ -319,6 +358,7 @@ class CardDataEnricher:
         return current
 
     def _handle_missing_field(self, item: dict[str, Any], field_name: str, reason: str) -> None:
+        """Log missing enrichment data and optionally raise when strict mode is on."""
         item_id = item.get("@id") or "<unknown>"
         message = f"Failed to enrich {field_name} for item {item_id}: {reason}"
         logger.warning(message)
@@ -336,6 +376,8 @@ if __name__ == "__main__":
         debug: bool = True,  # enable extended warning logs
         indent: int = 2,
     ) -> dict[str, Any]:
+        """Convert one local NC XML card to JSON, enrich it, and write the result."""
+
         # This local helper is only for manual testing. Production code should use
         # CardDataEnricher directly after the card payload has already been converted.
         input_path = Path(input_path)
