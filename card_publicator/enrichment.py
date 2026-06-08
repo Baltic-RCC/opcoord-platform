@@ -11,6 +11,7 @@ from integrations.elastic import Elastic
 
 DEFAULT_AREAS_INDEX = "config-areas"
 DEFAULT_CONTINGENCIES_INDEX = "csa-contingencies-*"
+DEFAULT_REMEDIAL_ACTIONS_INDEX = "csa-remedial-actions-*"
 
 NCProfileType = Literal["RAS", "SAR"]
 
@@ -21,6 +22,11 @@ class ContingencyFieldEnrichment:
     output_key: str
     missing_label: str
 
+@dataclass(frozen=True)
+class RemedialActionFieldEnrichment:
+    source_path: str
+    output_key: str
+    missing_label: str
 
 class CardDataEnricher:
     CONTINGENCY_FIELD_ENRICHMENTS = (
@@ -33,22 +39,35 @@ class CardDataEnricher:
 
     CONTINGENCY_MATCH_FIELD = "ContingencyEquipment.Contingency"
 
+    REMEDIAL_ACTION_FIELD_ENRICHMENTS = (
+        RemedialActionFieldEnrichment("name", "RemedialActionName", "name"),
+        RemedialActionFieldEnrichment("kind", "RemedialActionKind", "kind"),
+        RemedialActionFieldEnrichment("RemedialActionSystemOperator", "RemedialActionOperatorEIC", "operator"),
+    )
+
+    REMEDIAL_ACTION_OPERATOR_NAME_OUTPUT_KEY = "RemedialActionOperatorName"
+
+    REMEDIAL_ACTION_MATCH_FIELD = "@id"
+
     def __init__(
         self,
         elastic: Elastic,
         areas_index: str = DEFAULT_AREAS_INDEX,
         contingencies_index: str = DEFAULT_CONTINGENCIES_INDEX,
+        remedial_actions_index: str = DEFAULT_REMEDIAL_ACTIONS_INDEX,
         strict: bool = False,
         debug: bool = False,
     ):
         self.elastic = elastic
         self.areas_index = areas_index
         self.contingencies_index = contingencies_index
+        self.remedial_actions_index = remedial_actions_index
         self.strict = strict
         self.debug = debug
         self._area_by_eic: dict[str, dict[str, Any] | None] = {}
         self._party_by_eic: dict[str, dict[str, Any] | None] = {}
         self._contingency_by_identifier: dict[str, dict[str, Any] | None] = {}
+        self._remedial_action_by_identifier: dict[str, dict[str, Any] | None] = {}
 
     def enrich(self, payload: dict[str, Any]) -> dict[str, Any]:
         self.enrich_in_place(payload)
@@ -159,6 +178,11 @@ class CardDataEnricher:
         if identifier not in self._contingency_by_identifier:
             self._contingency_by_identifier[identifier] = self._get_first_doc_by_exact_field(self.contingencies_index, self.CONTINGENCY_MATCH_FIELD, identifier)
         return self._contingency_by_identifier[identifier]
+
+    def _get_remedial_action_by_identifier(self, identifier: str) -> dict[str, Any] | None:
+        if identifier not in self._remedial_action_by_identifier:
+            self._remedial_action_by_identifier[identifier] = self._get_first_doc_by_exact_field(self.remedial_actions_index, self.REMEDIAL_ACTION_MATCH_FIELD, identifier)
+        return self._remedial_action_by_identifier[identifier]
 
     def _get_first_doc_by_exact_field(self, index: str, field: str, value: str) -> dict[str, Any] | None:
         query = {
