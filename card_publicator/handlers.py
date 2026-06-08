@@ -7,6 +7,7 @@ import builders
 from integrations import elastic, opfab
 from loguru import logger
 import settings
+from enrichment import CardDataEnricher
 
 
 conf = settings.get_settings()
@@ -21,6 +22,7 @@ class RootPublicationHandler:
         # Services initialization
         try:
             self.elastic = elastic.Elastic()
+            self.card_data_enricher = CardDataEnricher(elastic=self.elastic, debug=False)
         except Exception as e:
             logger.error(f"Failed to initialize Elasticsearch service: {e}")
 
@@ -56,6 +58,9 @@ class RootPublicationHandler:
             data=message,
         )
 
+        # Enrich the converted card
+        self.card_data_enricher.enrich_in_place(payload=card.data)
+
         # Publish to OperatorFabric
         card_json = card.model_dump(exclude_none=True)
         response = self.opfab.post_card(card_json=card_json)
@@ -82,7 +87,7 @@ if __name__ == '__main__':
         "project-name": "RMM_X",
         "run-id": "00",
         "source-module": "CROSA",
-        "scenario-time": "2026-04-21T09:30:00+00:00",
+        "scenario-time": "2026-06-08T09:30:00+00:00",
         "time-horizon": "1D",
         "version": "1",
     }
