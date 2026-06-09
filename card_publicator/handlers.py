@@ -52,6 +52,7 @@ class RootPublicationHandler:
         card = card_factory.build(
             card_type=message_type.lower(),
             card_fields={
+                "publisher": conf.publicator.publisher,
                 "startDate": scenario_time,
                 "processInstanceId": instance_id,
             },

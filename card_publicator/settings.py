@@ -14,8 +14,13 @@ class WorkerSettings(BaseSettings):
 
 
 class BusinessSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=Path(__file__).parent.parent.joinpath("config/.env"),
+                                      env_prefix="PUBLICATOR_",
+                                      extra="ignore")
+
     cards_index: str = "dev-opcoord-cards"
     debug: bool = False
+    publisher: str
 
 
 @dataclass(frozen=True)

@@ -5,7 +5,7 @@ from typing import Optional, List, Any, Dict, Literal
 
 
 class Card(BaseModel):
-    publisher: str = Field(default="martynas")
+    publisher: str
     processVersion: str
     process: str
     processInstanceId: str
