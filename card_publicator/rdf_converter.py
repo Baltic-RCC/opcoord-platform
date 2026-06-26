@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 from collections import defaultdict
@@ -8,6 +9,11 @@ import pandas as pd
 
 
 # ---------- Helper functions ----------
+BOOLEAN_LITERAL_PATTERN = re.compile(r"^(?:true|false)$", re.IGNORECASE)
+INTEGER_LITERAL_PATTERN = re.compile(r"^[+-]?\d+$")
+NUMERIC_LITERAL_PATTERN = re.compile(r"^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$")
+
+
 def _strip_namespace(uri_or_qname: str) -> str:
     """Remove namespace/prefix, keep only local name (e.g., 'nc.X.y'|'...#y' -> 'X.y' or 'y')."""
     u = str(uri_or_qname)
@@ -24,15 +30,42 @@ def _literal_to_py(lit: Literal):
     dt = lit.datatype
     if dt in (XSD.integer, XSD.int, XSD.long, XSD.short, XSD.byte,
               XSD.unsignedInt, XSD.unsignedLong, XSD.unsignedShort, XSD.unsignedByte):
-        try: return int(lit)
+        try: return int(str(lit))
         except: return str(lit)
     if dt in (XSD.decimal, XSD.double, XSD.float):
-        try: return float(lit)
+        try: return float(str(lit))
         except: return str(lit)
     if dt in (XSD.boolean,):
-        s = str(lit).strip().lower()
-        return s in ("true", "1", "yes")
-    return str(lit)
+        return _boolean_literal_to_py(str(lit))
+    value = str(lit)
+    stripped_value = value.strip()
+    if _is_boolean_literal(stripped_value):
+        return _boolean_literal_to_py(stripped_value)
+    if _is_integer_literal(stripped_value):
+        return int(stripped_value)
+    if _is_numeric_literal(stripped_value):
+        return float(stripped_value)
+    return value
+
+
+def _is_boolean_literal(value: str) -> bool:
+    """Return True when a literal string contains only a boolean value."""
+    return bool(BOOLEAN_LITERAL_PATTERN.fullmatch(value))
+
+
+def _boolean_literal_to_py(value: str) -> bool:
+    """Convert an RDF boolean literal string to a Python bool."""
+    return value.strip().lower() in ("true", "1")
+
+
+def _is_integer_literal(value: str) -> bool:
+    """Return True when a literal string contains only an integer value."""
+    return bool(INTEGER_LITERAL_PATTERN.fullmatch(value))
+
+
+def _is_numeric_literal(value: str) -> bool:
+    """Return True when a literal string contains a numeric value."""
+    return bool(NUMERIC_LITERAL_PATTERN.fullmatch(value))
 
 
 def _best_id_for_subject(g: Graph, s: URIRef) -> str:
@@ -312,7 +345,7 @@ def normalize_cim_payload(payload: dict, root_only: bool = True) -> pd.DataFrame
 if __name__ == "__main__":
     # Testing
     rdf_xml = Path(__file__).parent.parent.joinpath("tests/data/nc_sar.xml")
-    result = convert_cim_rdf_to_json(rdf_xml, root_class=["OrdinaryContingency", "ExceptionalContingency"], key_mode="local")
+    result = convert_cim_rdf_to_json(rdf_xml, root_class=["BaseCasePowerFlowResult", "ContingencyPowerFlowResult"], key_mode="local")
 
     print(json.dumps(result, indent=2))
 
