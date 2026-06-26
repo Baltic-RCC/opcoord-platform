@@ -68,10 +68,30 @@ class Elastic:
         json_data = json.dumps(json_message, default=str, ensure_ascii=True, skipkeys=True)
         headers = {"Authorization": f"ApiKey {api_key.get_secret_value()}", "Content-Type": "application/json"}
         response = requests.post(url=url, data=json_data.encode(), headers=headers, verify=False)
-        if json.loads(response.content).get('error'):
-            logger.error(f"Send to Elasticsearch responded with error: {response.text}")
+
         if debug:
-            logger.debug(f"ELK response: {response.content}")
+            logger.debug(f"ELK response status: {response.status_code}, body: {response.content}")
+
+        try:
+            response.raise_for_status()
+        except requests.HTTPError as e:
+            logger.error(
+                f"Elasticsearch request failed: {e} | "
+                f"status={response.status_code} | "
+                f"url={url} | "
+                f"response={response.text}"
+            )
+            raise
+
+        # Elasticsearch can return 200/201 but still contain an error body (e.g. version conflict)
+        response_body = response.json()
+        if response_body.get("error"):
+            error_msg = (
+                f"Elasticsearch responded with error: {response_body['error']} | "
+                f"status={response.status_code} | url={url}"
+            )
+            logger.error(error_msg)
+            raise ValueError(error_msg)
 
         return response
 

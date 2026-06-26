@@ -8,34 +8,33 @@ from config.integrations import ElasticSettings, RabbitMqSettings
 
 
 class WorkerSettings(BaseSettings):
-    worker_name: str = "card-publicator"
+    worker_name: str = "card-retriever"
     worker_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    rmq_queue_in: str = "opcoord.cards.publish"
+    rmq_queue_in: str = "opcoord.cards.retrieve.elastic-storage"
 
 
 class BusinessSettings(BaseSettings):
     model_config = SettingsConfigDict(env_file=Path(__file__).parent.parent.joinpath("config/.env"),
-                                      env_prefix="PUBLICATOR_",
+                                      env_prefix="RETRIEVER_",
                                       extra="ignore")
 
     cards_index: str = "dev-opcoord-cards"
     debug: bool = False
-    publisher: str = "brcc"
 
 
 @dataclass(frozen=True)
-class PublicatorConfig:
+class RetrieverConfig:
     elastic: ElasticSettings
     rmq: RabbitMqSettings
-    publicator: BusinessSettings
+    retriever: BusinessSettings
 
 
 @lru_cache(maxsize=1)
-def get_settings() -> PublicatorConfig:
-    return PublicatorConfig(
+def get_settings() -> RetrieverConfig:
+    return RetrieverConfig(
         elastic=ElasticSettings(),
         rmq=RabbitMqSettings(),
-        publicator=BusinessSettings(),
+        retriever=BusinessSettings(),
     )
 
 

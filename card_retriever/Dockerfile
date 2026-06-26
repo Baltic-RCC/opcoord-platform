@@ -10,7 +10,7 @@ WORKDIR /app
 # Copy files to container
 COPY config/ ./config/
 COPY integrations/ ./integrations/
-COPY card_publicator/ ./card_publicator/
+COPY card_retriever/ ./card_retriever/
 
 # Change ownership to non-root user
 RUN chown -R appuser:appuser /app
@@ -19,5 +19,5 @@ USER appuser
 # Start process
 ENV PYTHONPATH="${PYTHONPATH}:/app"
 ENTRYPOINT ["python"]
-CMD ["card_publicator/worker.py"]
+CMD ["card_retriever/worker.py"]
 #ENTRYPOINT ["/bin/bash"]
