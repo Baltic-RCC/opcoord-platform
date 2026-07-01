@@ -16,7 +16,7 @@ class CardFactory:
     def __init__(self):
         self._builders = {
             "sar": SarProfileCardBuilder(),
-            "ras": None,
+            "ras": RasProfileCardBuilder(),
         }
 
     def build(self, card_type: str, card_fields: Dict[str, Any], data: Any) -> Card:
@@ -46,11 +46,28 @@ class SarProfileCardBuilder:
 
         return card
 
+class RasProfileCardBuilder:
+    def __init__(self):
+        pass
+
+    def build(self, content: str, card_fields: Dict[str, Any]) -> Card:
+        # Convert RAS rdfxml to json
+        converted = convert_cim_rdf_to_json(
+            content,
+            root_class=["RemedialActionSchedule"],
+            key_mode="local",
+        )
+
+        # Build card using config and converted data
+        card = Card(**config["ras"], **card_fields, data=converted)
+
+        return card
+
 
 if __name__ == '__main__':
     # Testing
     from datetime import datetime
     import uuid
-    content_path = Path(__file__).parent.parent.joinpath("tests/data/nc_sar.xml")
-    card_field = {"startDate": datetime.now(), "processInstanceId": str(uuid.uuid4())}
+    content_path = Path(__file__).parent.parent.joinpath("tests/data/nc_ras.xml")
+    card_field = {"startDate": datetime.now().isoformat(), "processInstanceId": str(uuid.uuid4()), "publisher": "lukas"}
     response = SarProfileCardBuilder().build(content=content_path, card_fields=card_field)

@@ -84,11 +84,11 @@ if __name__ == '__main__':
     headers = {
         # "message-id": f"{uuid.uuid4()}",
         "message-id": f"static-uuid",
-        "message-type": "SAR",
+        "message-type": "RAS",
         "project-name": "RMM_X",
         "run-id": "00",
         "source-module": "CROSA",
-        "scenario-time": "2026-06-08T09:30:00+00:00",
+        "scenario-time": "2026-07-02T09:30:00+00:00",
         "time-horizon": "1D",
         "version": "1",
     }
@@ -100,7 +100,7 @@ if __name__ == '__main__':
         timestamp=1747208205,
         headers=headers,
     )
-    with open(Path(__file__).parent.parent.joinpath("tests/data/nc_sar.xml"), "rb") as file:
+    with open(Path(__file__).parent.parent.joinpath("tests/data/nc_ras.xml"), "rb") as file:
         file_bytes = file.read()
 
     # Create instance

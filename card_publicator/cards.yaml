@@ -4,6 +4,15 @@ sar:
   process: "crosa"
   state: "sar"
   severity: "INFORMATION"
-  title: {"key": "crosa.summary"}
-  summary: {"key": "crosa.title"}
+  title: {"key": "crosa.title"}
+  summary: {"key": "crosa.summary"}
+  groupRecipients: ["ADMIN"]
+
+ras:
+  processVersion: "1"
+  process: "choiceQuestionProcess"
+  state: "questionState"
+  severity: "ACTION"
+  title: {"key": "choiceQuestionProcess.title"}
+  summary: {"key": "choiceQuestionProcess.summary"}
   groupRecipients: ["ADMIN"]
