@@ -84,21 +84,26 @@ class CardDataEnricher:
         self._contingency_by_identifier: dict[str, dict[str, Any] | None] = {}
         self._remedial_action_by_identifier: dict[str, dict[str, Any] | None] = {}
 
-    def enrich(self, payload: dict[str, Any]) -> dict[str, Any]:
+    def enrich(self, payload: dict[str, Any], card_fields: dict[str, Any] | None = None) -> dict[str, Any]:
         """Enrich a payload in place and return the same payload for fluent callers."""
-        self.enrich_in_place(payload)
+        self.enrich_in_place(payload, card_fields=card_fields)
         return payload
 
-    def enrich_in_place(self, payload: dict[str, Any]) -> None:
+    def enrich_in_place(self, payload: dict[str, Any], card_fields: dict[str, Any] | None = None) -> None:
         """Dispatch enrichment to the workflow that matches the detected NC profile."""
+        previous_process_instance_id = getattr(self, "_process_instance_id", "<unknown>")
+        self._process_instance_id = str((card_fields or {}).get("processInstanceId") or "<unknown>")
         profile_type = self._profile_type(payload)
-        logger.info(f"Enriching {profile_type} profile")
-        if profile_type == "RAS":
-            self._enrich_remedial_action_schedules(payload)
-        elif profile_type == "SAR":
-            self._enrich_base_case_power_flow_results(payload)
-            self._enrich_contingency_power_flow_results(payload)
-        logger.success(f"Enriched {profile_type} successfully")
+        logger.info(f"Enriching {profile_type} profile for processInstanceId={self._process_instance_id}")
+        try:
+            if profile_type == "RAS":
+                self._enrich_remedial_action_schedules(payload)
+            elif profile_type == "SAR":
+                self._enrich_base_case_power_flow_results(payload)
+                self._enrich_contingency_power_flow_results(payload)
+            logger.success(f"Enriched {profile_type} successfully for processInstanceId={self._process_instance_id}")
+        finally:
+            self._process_instance_id = previous_process_instance_id
 
     def _enrich_base_case_power_flow_results(self, payload: dict[str, Any]) -> None:
         """Add reported area names to SAR base-case power-flow results."""
@@ -269,7 +274,7 @@ class CardDataEnricher:
             }
         }
         if self.debug:
-            logger.debug(f"Querying {index} for {field}={value}")
+            logger.debug(f"[Card id={self._process_instance_id}] Querying {index} for {field}={value}")
         hits = self.elastic.get_docs_by_query(index=index, query=query, size=1, return_df=False)
         docs = self._extract_source_docs(hits)
         return docs[0] if docs else None
@@ -328,7 +333,7 @@ class CardDataEnricher:
     def _log_field_enriched(self, item: dict[str, Any], field_name: str, value: Any) -> None:
         """Emit a debug log for one enriched field when debug logging is enabled."""
         if self.debug:
-            logger.debug(f"Enriched {field_name} for item {item.get('@id')}: {value}")
+            logger.debug(f"[Card id={self._process_instance_id}] Enriched {field_name} for item {item.get('@id')}: {value}")
 
     @staticmethod
     def _section_items(payload: dict[str, Any], section_name: str) -> list[dict[str, Any]]:
@@ -359,8 +364,7 @@ class CardDataEnricher:
 
     def _handle_missing_field(self, item: dict[str, Any], field_name: str, reason: str) -> None:
         """Log missing enrichment data and optionally raise when strict mode is on."""
-        item_id = item.get("@id") or "<unknown>"
-        message = f"Failed to enrich {field_name} for item {item_id}: {reason}"
+        message = f"[Card id={self._process_instance_id}] Failed to enrich {field_name}: {reason}"
         logger.warning(message)
         if self.strict:
             raise ValueError(message)
@@ -370,8 +374,8 @@ if __name__ == "__main__":
     from card_publicator.rdf_converter import convert_cim_rdf_to_json
 
     def enrich_nc_xml_file(
-        input_path: str = r"C:\Users\lukas.navickas\Documents\Opcoord_testing\example_cards\test_ras_2.xml",
-        output_path: str = r"C:\Users\lukas.navickas\Documents\Opcoord_testing\enriched_cards\enriched_card_ras_2.json",
+        input_path: str = r"C:\Users\lukas.navickas\Documents\Opcoord_testing\example_cards\SAR_20260703T0630_ID_1_adcf426e-da96-4e95-a9d4-2081710ca835.xml",
+        output_path: str = r"C:\Users\lukas.navickas\Documents\Opcoord_testing\enriched_cards\enriched_card_sar_ID_test.json",
         strict: bool = False,  # If strict = True, return ValueError for missing enrichment fields and fails
         debug: bool = True,  # enable extended warning logs
         indent: int = 2,

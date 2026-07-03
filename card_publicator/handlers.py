@@ -55,19 +55,20 @@ class RootPublicationHandler:
 
         # Run card builder
         instance_id = f"{time_horizon}_{run_id}_{version}_{message_id}"
+        card_fields = {
+            "publisher": conf.publicator.publisher,
+            "startDate": scenario_time,
+            "processInstanceId": instance_id,
+        }
         card_factory = builders.CardFactory()
         card = card_factory.build(
             card_type=message_type.lower(),
-            card_fields={
-                "publisher": conf.publicator.publisher,
-                "startDate": scenario_time,
-                "processInstanceId": instance_id,
-            },
+            card_fields=card_fields,
             data=message,
         )
 
         # Enrich the converted card
-        self.card_data_enricher.enrich_in_place(payload=card.data)
+        self.card_data_enricher.enrich_in_place(payload=card.data, card_fields=card_fields)
 
         # Publish to OperatorFabric
         card_json = card.model_dump(exclude_none=True)
