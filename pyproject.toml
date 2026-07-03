@@ -5,8 +5,11 @@ description = "Baltic regional coordination tool"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "aniso8601>=10.0.1",
     "elasticsearch==8.19.0",
     "loguru>=0.7.3",
+    "lxml>=6.1.1",
+    "minio>=7.2.20",
     "pandas>=3.0.1",
     "pika>=1.3.2",
     "pydantic>=2.12.5",

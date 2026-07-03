@@ -1,10 +1,12 @@
 import os
+import json
+from io import BytesIO
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from pika import BasicProperties
 import builders
-from integrations import elastic, opfab
+from integrations import elastic, opfab, s3_storage
 from loguru import logger
 import settings
 from enrichment import CardDataEnricher
@@ -30,6 +32,11 @@ class RootPublicationHandler:
             self.opfab = opfab.AuthenticatedSession()
         except Exception as e:
             logger.error(f"Failed to initialize OperatorFabric service: {e}")
+
+        try:
+            self.s3 = s3_storage.S3Minio()
+        except Exception as e:
+            logger.error(f"Failed to initialize S3Minio service: {e}")
 
     def handle(self, message: bytes, properties: object, **kwargs):
         """
@@ -67,12 +74,18 @@ class RootPublicationHandler:
         response = self.opfab.post_card(card_json=card_json)
         logger.info(f"Card publication details: {response.json()}")
 
-        # Publish to Elasticsearch
-        # if response.status_code == 201 and "id" in response.json():
-        #     card_json.update(response.json())
-        #     response = self.elastic.send_to_elastic(index=conf.publicator.cards_index,
-        #                                             json_message=card_json,
-        #                                             id=card_json.get("id"))
+        # Upload JSON card to Object Storage (S3) for long term storage
+        if conf.publicator.enable_s3_content_storage:
+            s3_path = f"opcoord/cards/{response.json().get('id', uuid.uuid4().__str__())}.json"
+            json_bytes = json.dumps(card_json, indent=2).encode("utf-8")
+            json_buffer = BytesIO(json_bytes)
+            json_buffer.name = s3_path  # required — upload_object uses file_object.name as object_name
+            self.s3.upload_object(
+                file_path_or_file_object=json_buffer,
+                bucket_name=conf.publicator.s3_bucket_name,
+            )
+            logger.info(f"Uploaded JSON card to S3 at path: {s3_path}")
+            card_json["contentReference"] = s3_path
 
         logger.success(f"Message handling completed successfully")
 

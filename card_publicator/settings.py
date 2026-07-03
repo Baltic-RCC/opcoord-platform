@@ -4,7 +4,7 @@ import uuid
 from pathlib import Path
 from pydantic import BaseModel, Field
 from pydantic_settings import SettingsConfigDict, BaseSettings
-from config.integrations import ElasticSettings, RabbitMqSettings
+from config.integrations import ElasticSettings, RabbitMqSettings, MinioSettings
 
 
 class WorkerSettings(BaseSettings):
@@ -19,14 +19,17 @@ class BusinessSettings(BaseSettings):
                                       extra="ignore")
 
     cards_index: str = "dev-opcoord-cards"
-    debug: bool = False
     publisher: str = "brcc"
+    enable_s3_content_storage: bool = True
+    s3_bucket_name: str = "analyses"
+    debug: bool = False
 
 
 @dataclass(frozen=True)
 class PublicatorConfig:
     elastic: ElasticSettings
     rmq: RabbitMqSettings
+    minio: MinioSettings
     publicator: BusinessSettings
 
 
@@ -35,6 +38,7 @@ def get_settings() -> PublicatorConfig:
     return PublicatorConfig(
         elastic=ElasticSettings(),
         rmq=RabbitMqSettings(),
+        minio=MinioSettings(),
         publicator=BusinessSettings(),
     )
 

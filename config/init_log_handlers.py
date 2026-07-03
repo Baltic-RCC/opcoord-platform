@@ -2,7 +2,7 @@ import logging
 import inspect
 from loguru import logger
 import sys
-from pathlib import Path
+from pydantic import SecretStr
 import datetime
 import traceback
 import time
@@ -37,12 +37,12 @@ class InterceptHandler(logging.Handler):
 
 class ElasticLogHandler:
 
-    def __init__(self, server: str, api_key: str, index: str, logs_rollover: bool = False, extra: dict | None = None):
+    def __init__(self, server: str, api_key: SecretStr, index: str, logs_rollover: bool = False, extra: dict | None = None):
         self.server = server
         self.index = index
         self.logs_rollover = logs_rollover
         self.extra = extra if extra else {}
-        self.client = Elasticsearch(self.server, api_key=api_key)
+        self.client = Elasticsearch(self.server, api_key=api_key.get_secret_value())
 
         self._connected = True
         self._last_retry = 0

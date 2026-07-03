@@ -18,7 +18,7 @@ class Logging(BaseSettings):
     exclude_loggers: List[str] = ["pika"]
     enqueue: bool = False
     catch: bool = False
-    elastic_handler: bool = False
+    elastic_handler: bool = True
     elastic_index: str = "dev-opcoord-logs"
 
 
