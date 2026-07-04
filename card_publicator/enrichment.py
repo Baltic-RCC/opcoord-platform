@@ -15,7 +15,7 @@ Workflow overview:
     * Walk the profile-specific card sections that need enrichment.
     * Resolve referenced area, party, contingency, and remedial-action documents from Elastic.
     * Copy configured source fields into the card payload and add operator/area display names.
-    * Log or raise on missing enrichment data depending on strict mode.
+    * Log missing enrichment data and raise when strict mode is enabled.
 """
 
 DEFAULT_AREAS_INDEX = "config-areas"
@@ -69,16 +69,16 @@ class CardDataEnricher:
         areas_index: str = DEFAULT_AREAS_INDEX,
         contingencies_index: str = DEFAULT_CONTINGENCIES_INDEX,
         remedial_actions_index: str = DEFAULT_REMEDIAL_ACTIONS_INDEX,
-        strict: bool = False,
-        debug: bool = False,
+        enrichment_strict: bool | None = None,
+        enrichment_verbose_logging: bool | None = None,
     ):
         """Store Elastic/index settings and initialize per-run lookup caches."""
         self.elastic = elastic
         self.areas_index = areas_index
         self.contingencies_index = contingencies_index
         self.remedial_actions_index = remedial_actions_index
-        self.strict = strict
-        self.debug = debug
+        self.enrichment_strict = enrichment_strict
+        self.enrichment_verbose_logging = enrichment_verbose_logging
         self._area_by_eic: dict[str, dict[str, Any] | None] = {}
         self._party_by_eic: dict[str, dict[str, Any] | None] = {}
         self._contingency_by_identifier: dict[str, dict[str, Any] | None] = {}
@@ -273,8 +273,8 @@ class CardDataEnricher:
                 "minimum_should_match": 1,
             }
         }
-        if self.debug:
-            logger.debug(f"[Card id={self._process_instance_id}] Querying {index} for {field}={value}")
+        if self.enrichment_verbose_logging:
+            logger.debug(f"[Card id={self._process_instance_id}] Looking up Elastic document in {index} for {field}={value}")
         hits = self.elastic.get_docs_by_query(index=index, query=query, size=1, return_df=False)
         docs = self._extract_source_docs(hits)
         return docs[0] if docs else None
@@ -331,8 +331,8 @@ class CardDataEnricher:
         return normalized or None
 
     def _log_field_enriched(self, item: dict[str, Any], field_name: str, value: Any) -> None:
-        """Emit a debug log for one enriched field when debug logging is enabled."""
-        if self.debug:
+        """Emit a detailed log for one enriched field when verbose logging is enabled."""
+        if self.enrichment_verbose_logging:
             logger.debug(f"[Card id={self._process_instance_id}] Enriched {field_name} for item {item.get('@id')}: {value}")
 
     @staticmethod
@@ -363,10 +363,11 @@ class CardDataEnricher:
         return current
 
     def _handle_missing_field(self, item: dict[str, Any], field_name: str, reason: str) -> None:
-        """Log missing enrichment data and optionally raise when strict mode is on."""
+        """Log missing enrichment data and raise when strict mode is enabled."""
         message = f"[Card id={self._process_instance_id}] Failed to enrich {field_name}: {reason}"
         logger.warning(message)
-        if self.strict:
+        if self.enrichment_strict:
+            logger.warning(f"[Card id={self._process_instance_id}] Strict enrichment mode is enabled; raising ValueError")
             raise ValueError(message)
 
 
@@ -376,8 +377,8 @@ if __name__ == "__main__":
     def enrich_nc_xml_file(
         input_path: str = r"C:\Users\lukas.navickas\Documents\Opcoord_testing\example_cards\SAR_20260703T0630_ID_1_adcf426e-da96-4e95-a9d4-2081710ca835.xml",
         output_path: str = r"C:\Users\lukas.navickas\Documents\Opcoord_testing\enriched_cards\enriched_card_sar_ID_test.json",
-        strict: bool = False,  # If strict = True, return ValueError for missing enrichment fields and fails
-        debug: bool = True,  # enable extended warning logs
+        enrichment_strict: bool = False,  # If strict = True, raise ValueError for missing enrichment fields
+        enrichment_verbose_logging: bool = True,  # enable detailed enrichment logging
         indent: int = 2,
     ) -> dict[str, Any]:
         """Convert one local NC XML card to JSON, enrich it, and write the result."""
@@ -400,14 +401,13 @@ if __name__ == "__main__":
                 key_mode="local",
             )
 
-        # Reuse the repository Elastic integration and default enrichment indices.
         enricher = CardDataEnricher(
-            elastic=Elastic(debug=debug),
+            elastic=Elastic(debug=enrichment_verbose_logging),
             areas_index=DEFAULT_AREAS_INDEX,
             contingencies_index=DEFAULT_CONTINGENCIES_INDEX,
             remedial_actions_index=DEFAULT_REMEDIAL_ACTIONS_INDEX,
-            strict=strict,
-            debug=debug,
+            enrichment_strict=enrichment_strict,
+            enrichment_verbose_logging=enrichment_verbose_logging,
         )
         enricher.enrich(payload)
 

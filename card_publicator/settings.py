@@ -23,6 +23,8 @@ class BusinessSettings(BaseSettings):
     enable_s3_content_storage: bool = True
     s3_bucket_name: str = "analyses"
     debug: bool = False
+    enrichment_strict: bool = False
+    enrichment_verbose_logging: bool = True
 
 
 @dataclass(frozen=True)

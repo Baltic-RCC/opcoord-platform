@@ -17,14 +17,16 @@ conf = settings.get_settings()
 
 class RootPublicationHandler:
 
-    def __init__(self, debug: bool = conf.publicator.debug):
+    def __init__(self, debug: bool = conf.publicator.debug, enrichment_strict: bool = conf.publicator.enrichment_strict, enrichment_verbose_logging: bool = conf.publicator.enrichment_verbose_logging):
 
         self.debug = debug
+        self.enrichment_strict = enrichment_strict
+        self.enrichment_verbose_logging = enrichment_verbose_logging
 
         # Services initialization
         try:
             self.elastic = elastic.Elastic()
-            self.card_data_enricher = CardDataEnricher(elastic=self.elastic, debug=False)
+            self.card_data_enricher = CardDataEnricher(elastic=self.elastic, enrichment_strict=self.enrichment_strict, enrichment_verbose_logging=self.enrichment_verbose_logging)
         except Exception as e:
             logger.error(f"Failed to initialize Elasticsearch service: {e}")
 
@@ -95,14 +97,14 @@ class RootPublicationHandler:
 
 if __name__ == '__main__':
     # Define RMQ test message
+    test_message_id = str(uuid.uuid4())
     headers = {
-        # "message-id": f"{uuid.uuid4()}",
-        "message-id": f"static-uuid",
-        "message-type": "RAS",
+        "message-id": test_message_id,
+        "message-type": "SAR",
         "project-name": "RMM_X",
         "run-id": "00",
         "source-module": "CROSA",
-        "scenario-time": "2026-07-02T09:30:00+00:00",
+        "scenario-time": "2026-07-04T09:30:00+00:00",
         "time-horizon": "1D",
         "version": "1",
     }
@@ -114,7 +116,7 @@ if __name__ == '__main__':
         timestamp=1747208205,
         headers=headers,
     )
-    with open(Path(__file__).parent.parent.joinpath("tests/data/nc_ras.xml"), "rb") as file:
+    with open(Path(__file__).parent.parent.joinpath("tests/data/nc_sar.xml"), "rb") as file:
         file_bytes = file.read()
 
     # Create instance
