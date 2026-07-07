@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal
 from loguru import logger
@@ -79,10 +80,9 @@ class CardDataEnricher:
         self.remedial_actions_index = remedial_actions_index
         self.enrichment_strict = enrichment_strict
         self.enrichment_verbose_logging = enrichment_verbose_logging
-        self._area_by_eic: dict[str, dict[str, Any] | None] = {}
-        self._party_by_eic: dict[str, dict[str, Any] | None] = {}
-        self._contingency_by_identifier: dict[str, dict[str, Any] | None] = {}
-        self._remedial_action_by_identifier: dict[str, dict[str, Any] | None] = {}
+        self._areas_cache: list[dict[str, Any]] = []
+        self._contingencies_cache: list[dict[str, Any]] = []
+        self._remedial_actions_cache: list[dict[str, Any]] = []
 
     def enrich(self, payload: dict[str, Any], card_fields: dict[str, Any] | None = None) -> dict[str, Any]:
         """Enrich a payload in place and return the same payload for fluent callers."""
@@ -96,6 +96,7 @@ class CardDataEnricher:
         profile_type = self._profile_type(payload)
         logger.info(f"Enriching {profile_type} profile for processInstanceId={self._process_instance_id}")
         try:
+            self._prime_enrichment_cache(payload, profile_type)
             if profile_type == "RAS":
                 self._enrich_remedial_action_schedules(payload)
             elif profile_type == "SAR":
@@ -104,6 +105,63 @@ class CardDataEnricher:
             logger.success(f"Enriched {profile_type} successfully for processInstanceId={self._process_instance_id}")
         finally:
             self._process_instance_id = previous_process_instance_id
+            self._clear_enrichment_cache()
+
+    def _prime_enrichment_cache(self, payload: dict[str, Any], profile_type: NCProfileType) -> None:
+        """Query and cache all needed indices upfront based on profile type and card query period."""
+        query_period_start, query_period_end = self._query_period(payload)
+        self._areas_cache = self._query_areas_index(self.areas_index)
+        self._contingencies_cache = self._query_csa_indices(
+            self.contingencies_index,
+            query_period_start=query_period_start,
+            query_period_end=query_period_end,
+        )
+        if profile_type == "RAS":
+            self._remedial_actions_cache = self._query_csa_indices(
+                self.remedial_actions_index,
+                query_period_start=query_period_start,
+                query_period_end=query_period_end,
+            )
+
+    def _clear_enrichment_cache(self) -> None:
+        """Clear all temporary enrichment caches to free memory."""
+        self._areas_cache = []
+        self._contingencies_cache = []
+        self._remedial_actions_cache = []
+
+    def _query_areas_index(self, index: str) -> list[dict[str, Any]]:
+        """Query an entire index and return all source documents."""
+        query = {"match_all": {}}
+        if self.enrichment_verbose_logging:
+            logger.debug(f"[Card id={self._process_instance_id}] Priming enrichment cache from {index}")
+        hits = self.elastic.get_docs_by_query(index=index, query=query, size=100, return_df=False)
+        docs = self._extract_source_docs(hits)
+        if self.enrichment_verbose_logging:
+            logger.debug(f"[Card id={self._process_instance_id}] Loaded {len(docs)} documents from {index}")
+        return docs
+
+    def _query_csa_indices(
+        self,
+        index: str,
+        query_period_start: datetime,
+        query_period_end: datetime,
+    ) -> list[dict[str, Any]]:
+        """Query CSA indices for documents whose FullModel time range overlaps the card query period."""
+        query = {
+            "bool": {
+                "must": [
+                    {"range": {"FullModel.startDate": {"lte": query_period_end.isoformat(),"format": "strict_date_optional_time"}}},
+                    {"range": {"FullModel.endDate": {"gte": query_period_start.isoformat(),"format": "strict_date_optional_time"}}},
+                ]
+            }
+        }
+        if self.enrichment_verbose_logging:
+            logger.debug(f"[Card id={self._process_instance_id}] Priming enrichment cache from {index} for query period {query_period_start.isoformat()} - {query_period_end.isoformat()}")
+        hits = self.elastic.get_docs_by_query(index=index, query=query, size=5000, return_df=False)
+        docs = self._extract_source_docs(hits)
+        if self.enrichment_verbose_logging:
+            logger.debug(f"[Card id={self._process_instance_id}] Loaded {len(docs)} documents from {index}")
+        return docs
 
     def _enrich_base_case_power_flow_results(self, payload: dict[str, Any]) -> None:
         """Add reported area names to SAR base-case power-flow results."""
@@ -239,45 +297,32 @@ class CardDataEnricher:
         self._handle_missing_field(item, self.REMEDIAL_ACTION_OPERATOR_NAME_OUTPUT_KEY, reason)
 
     def _get_area_by_eic(self, eic: str) -> dict[str, Any] | None:
-        """Return an area document by EIC, using a local cache to avoid repeat queries."""
-        if eic not in self._area_by_eic:
-            self._area_by_eic[eic] = self._get_first_doc_by_exact_field(self.areas_index, "area.eic", eic)
-        return self._area_by_eic[eic]
+        """Return an area document from the in-memory cache by EIC."""
+        for doc in self._areas_cache:
+            if self._get_path(doc, "area.eic") == eic:
+                return doc
+        return None
 
     def _get_party_by_eic(self, eic: str) -> dict[str, Any] | None:
-        """Return a party document by EIC, using a local cache to avoid repeat queries."""
-        if eic not in self._party_by_eic:
-            self._party_by_eic[eic] = self._get_first_doc_by_exact_field(self.areas_index, "party.eic", eic)
-        return self._party_by_eic[eic]
+        """Return a party document from the in-memory cache by EIC."""
+        for doc in self._areas_cache:
+            if self._get_path(doc, "party.eic") == eic:
+                return doc
+        return None
 
     def _get_contingency_by_identifier(self, identifier: str) -> dict[str, Any] | None:
-        """Return a contingency document by card identifier, caching the result."""
-        if identifier not in self._contingency_by_identifier:
-            self._contingency_by_identifier[identifier] = self._get_first_doc_by_exact_field(self.contingencies_index, self.CONTINGENCY_MATCH_FIELD, identifier)
-        return self._contingency_by_identifier[identifier]
+        """Return a contingency document from the in-memory cache by identifier."""
+        for doc in self._contingencies_cache:
+            if self._get_path(doc, self.CONTINGENCY_MATCH_FIELD) == identifier:
+                return doc
+        return None
 
     def _get_remedial_action_by_identifier(self, identifier: str) -> dict[str, Any] | None:
-        """Return a remedial-action document by identifier, caching the result."""
-        if identifier not in self._remedial_action_by_identifier:
-            self._remedial_action_by_identifier[identifier] = self._get_first_doc_by_exact_field(self.remedial_actions_index, self.REMEDIAL_ACTION_MATCH_FIELD, identifier)
-        return self._remedial_action_by_identifier[identifier]
-
-    def _get_first_doc_by_exact_field(self, index: str, field: str, value: str) -> dict[str, Any] | None:
-        """Query Elastic for the first document matching an exact field value."""
-        query = {
-            "bool": {
-                "should": [
-                    {"term": {field: value}},
-                    {"term": {f"{field}.keyword": value}},
-                ],
-                "minimum_should_match": 1,
-            }
-        }
-        if self.enrichment_verbose_logging:
-            logger.debug(f"[Card id={self._process_instance_id}] Looking up Elastic document in {index} for {field}={value}")
-        hits = self.elastic.get_docs_by_query(index=index, query=query, size=1, return_df=False)
-        docs = self._extract_source_docs(hits)
-        return docs[0] if docs else None
+        """Return a remedial-action document from the in-memory cache by identifier."""
+        for doc in self._remedial_actions_cache:
+            if self._get_path(doc, self.REMEDIAL_ACTION_MATCH_FIELD) == identifier:
+                return doc
+        return None
 
     @staticmethod
     def _extract_source_docs(response: Any) -> list[dict[str, Any]]:
@@ -329,6 +374,55 @@ class CardDataEnricher:
             return None
         normalized = str(value).strip().upper()
         return normalized or None
+
+    def _query_period(self, payload: dict[str, Any]) -> tuple[datetime, datetime]:
+        """
+        Return (query_period_start, query_period_end) based on the NC profile type.
+        * SAR – a symmetric 30-minute window around FullModel.scenarioTime.
+        * RAS – the FullModel.startDate/FullModel.endDate interval.
+        """
+        profile_type = self._profile_type(payload)
+        if profile_type == "SAR":
+            return self._sar_query_period(payload)
+        if profile_type == "RAS":
+            return self._ras_query_period(payload)
+        raise ValueError(f"Unsupported profile type for query period: {profile_type}")
+
+    @staticmethod
+    def _sar_query_period(payload: dict[str, Any]) -> tuple[datetime, datetime]:
+        """
+        Compute a 30-minute window around FullModel.scenarioTime for SAR profiles.
+
+        Returns:
+            A (query_period_start, query_period_end) tuple of datetime.datetime objects.
+        """
+        for full_model in CardDataEnricher._section_items(payload, "FullModel"):
+            scenario_time_raw = full_model.get("scenarioTime")
+            if scenario_time_raw:
+                scenario_time = datetime.fromisoformat(str(scenario_time_raw))
+                return (
+                    scenario_time - timedelta(minutes=30),
+                    scenario_time + timedelta(minutes=30),
+                )
+        raise ValueError("FullModel.scenarioTime is required for SAR query period")
+
+    @staticmethod
+    def _ras_query_period(payload: dict[str, Any]) -> tuple[datetime, datetime]:
+        """
+        Read FullModel.startDate`` and ``FullModel.endDate`` as the query period for RAS profiles.
+
+        Returns:
+            A ``(query_period_start, query_period_end)`` tuple of :class:`~datetime.datetime` objects.
+        """
+        for full_model in CardDataEnricher._section_items(payload, "FullModel"):
+            start_date_raw = full_model.get("startDate")
+            end_date_raw = full_model.get("endDate")
+            if start_date_raw and end_date_raw:
+                return (
+                    datetime.fromisoformat(str(start_date_raw)),
+                    datetime.fromisoformat(str(end_date_raw)),
+                )
+        raise ValueError("FullModel.startDate and FullModel.endDate are required for RAS query period")
 
     def _log_field_enriched(self, item: dict[str, Any], field_name: str, value: Any) -> None:
         """Emit a detailed log for one enriched field when verbose logging is enabled."""
