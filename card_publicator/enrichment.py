@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 from io import BytesIO
 from pathlib import Path
 from typing import Any, Literal
-from zoneinfo import ZoneInfo
+import pytz
 from loguru import logger
 
 from integrations.elastic import Elastic
@@ -449,9 +449,9 @@ class CardDataEnricher:
             if scenario_time:
                 if isinstance(scenario_time, str):
                     scenario_time = datetime.fromisoformat(scenario_time)
-                # FullModel.scenarioTime is treated as CET when it has no timezone and then normalized to UTC.
+                # Treat naive FullModel.scenarioTime as CET/CEST and normalize to UTC.
                 if scenario_time.tzinfo is None:
-                    scenario_time = scenario_time.replace(tzinfo=ZoneInfo("CET"))
+                    scenario_time = pytz.timezone("CET").localize(scenario_time)
                 scenario_time = scenario_time.astimezone(UTC)
                 return (
                     scenario_time - timedelta(minutes=30),
