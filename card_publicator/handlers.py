@@ -1,4 +1,3 @@
-import os
 import json
 from io import BytesIO
 import uuid
@@ -26,7 +25,13 @@ class RootPublicationHandler:
         # Services initialization
         try:
             self.elastic = elastic.Elastic()
-            self.card_data_enricher = CardDataEnricher(elastic=self.elastic, enrichment_strict=self.enrichment_strict, enrichment_verbose_logging=self.enrichment_verbose_logging)
+            self.card_data_enricher = CardDataEnricher(
+                elastic=self.elastic,
+                debug_s3=s3_storage.S3Minio(),
+                debug_dump_bucket_name=conf.publicator.s3_bucket_name,
+                enrichment_strict=self.enrichment_strict,
+                enrichment_verbose_logging=self.enrichment_verbose_logging,
+            )
         except Exception as e:
             logger.error(f"Failed to initialize Elasticsearch service: {e}")
 
@@ -67,6 +72,12 @@ class RootPublicationHandler:
             card_type=message_type.lower(),
             card_fields=card_fields,
             data=message,
+        )
+
+        logger.info(
+            "Built card payload for processInstanceId={}:\n{}",
+            instance_id,
+            json.dumps(card.model_dump(exclude_none=False), ensure_ascii=False, indent=2, default=str),
         )
 
         # Enrich the converted card
@@ -116,7 +127,7 @@ if __name__ == '__main__':
         timestamp=1747208205,
         headers=headers,
     )
-    with open(Path(__file__).parent.parent.joinpath("tests/data/nc_sar.xml"), "rb") as file:
+    with open(Path(__file__).parent.parent.joinpath("tests/data/SAR_20260708T2030_1D_1_a753f34b-4f07-49a3-8335-8ff9c0e8f907.xml"), "rb") as file:
         file_bytes = file.read()
 
     # Create instance
