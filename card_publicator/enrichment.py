@@ -23,8 +23,8 @@ Workflow overview:
 """
 
 DEFAULT_AREAS_INDEX = "config-areas"
-DEFAULT_CONTINGENCIES_INDEX = "csa-contingencies-*"
-DEFAULT_REMEDIAL_ACTIONS_INDEX = "csa-remedial-actions-*"
+DEFAULT_CONTINGENCIES_INDEX = "csa-contingencies*"
+DEFAULT_REMEDIAL_ACTIONS_INDEX = "csa-remedial-actions*"
 
 NCProfileType = Literal["RAS", "SAR"]
 
@@ -157,16 +157,17 @@ class CardDataEnricher:
         query = {
             "bool": {
                 "must": [
-                    {"range": {"FullModel.startDate": {"lte": query_period_end.isoformat(),"format": "strict_date_optional_time"}}},
-                    {"range": {"FullModel.endDate": {"gte": query_period_start.isoformat(),"format": "strict_date_optional_time"}}},
+                    {"range": {"FullModel.startDate": {"lte": query_period_end,"format": "strict_date_optional_time"}}},
+                    {"range": {"FullModel.endDate": {"gte": query_period_start,"format": "strict_date_optional_time"}}},
                 ]
             }
         }
         if self.enrichment_verbose_logging:
             logger.debug(f"[Card id={self._process_instance_id}] Priming enrichment cache from {index} for query period {query_period_start.isoformat()} - {query_period_end.isoformat()}")
-        hits = self.elastic.get_docs_by_query(index=index, query=query, size=5000, return_df=True)
+        hits = self.elastic.get_docs_by_query(index=index, query=query, size=500, return_df=True)
         logger.info(
-            f"[Raw Elastic response type: {type(hits)}, keys: {hits.keys() if isinstance(hits, dict) else 'N/A'}]")
+            f"[Raw Elastic response type: {type(hits)}, keys: {hits.keys() if isinstance(hits, dict) else 'N/A'}], shape: {hits.shape}")
+        logger.info(f"raw indices: {self.elastic.client.indices.resolve_index(name=index)}")
         if isinstance(hits, dict) and 'hits' in hits:
             logger.info(f"[Hits total: {hits['hits']['total']}, returned count: {len(hits['hits']['hits'])}]")
         docs = self._extract_source_docs(hits)
