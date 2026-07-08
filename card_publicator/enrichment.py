@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from io import BytesIO
 from pathlib import Path
 from typing import Any, Literal
+from zoneinfo import ZoneInfo
 from loguru import logger
 
 from integrations.elastic import Elastic
@@ -444,9 +445,14 @@ class CardDataEnricher:
             A (query_period_start, query_period_end) tuple of datetime.datetime objects.
         """
         for full_model in CardDataEnricher._section_items(payload, "FullModel"):
-            scenario_time_raw = full_model.get("scenarioTime")
-            if scenario_time_raw:
-                scenario_time = datetime.fromisoformat(str(scenario_time_raw))
+            scenario_time = full_model.get("scenarioTime")
+            if scenario_time:
+                if isinstance(scenario_time, str):
+                    scenario_time = datetime.fromisoformat(scenario_time)
+                # FullModel.scenarioTime is treated as CET when it has no timezone and then normalized to UTC.
+                if scenario_time.tzinfo is None:
+                    scenario_time = scenario_time.replace(tzinfo=ZoneInfo("CET"))
+                scenario_time = scenario_time.astimezone(UTC)
                 return (
                     scenario_time - timedelta(minutes=30),
                     scenario_time + timedelta(minutes=30),
@@ -466,8 +472,8 @@ class CardDataEnricher:
             end_date_raw = full_model.get("endDate")
             if start_date_raw and end_date_raw:
                 return (
-                    datetime.fromisoformat(str(start_date_raw)),
-                    datetime.fromisoformat(str(end_date_raw)),
+                    datetime.fromisoformat(start_date_raw),
+                    datetime.fromisoformat(end_date_raw),
                 )
         raise ValueError("FullModel.startDate and FullModel.endDate are required for RAS query period")
 
