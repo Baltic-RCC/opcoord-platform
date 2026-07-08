@@ -164,7 +164,11 @@ class CardDataEnricher:
         }
         if self.enrichment_verbose_logging:
             logger.debug(f"[Card id={self._process_instance_id}] Priming enrichment cache from {index} for query period {query_period_start.isoformat()} - {query_period_end.isoformat()}")
-        hits = self.elastic.get_docs_by_query(index=index, query=query, size=5000, return_df=True)
+        hits = self.elastic.get_docs_by_query(index=index, query=query, size=5000, return_df=False)
+        logger.info(
+            f"[Raw Elastic response type: {type(hits)}, keys: {hits.keys() if isinstance(hits, dict) else 'N/A'}]")
+        if isinstance(hits, dict) and 'hits' in hits:
+            logger.info(f"[Hits total: {hits['hits']['total']}, returned count: {len(hits['hits']['hits'])}]")
         docs = self._extract_source_docs(hits)
         if self.enrichment_verbose_logging:
             logger.debug(f"[Card id={self._process_instance_id}] Loaded {len(docs)} documents from {index}")
