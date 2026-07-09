@@ -3,14 +3,12 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from io import BytesIO
 from pathlib import Path
 from typing import Any, Literal
 import pytz
 from loguru import logger
 
 from integrations.elastic import Elastic
-from integrations.s3_storage import S3Minio
 
 """Card enrichment helpers for adding human-readable metadata to NC cards.
 
@@ -70,8 +68,6 @@ class CardDataEnricher:
     def __init__(
         self,
         elastic: Elastic,
-        debug_s3: S3Minio | None = None,
-        debug_dump_bucket_name: str | None = None,
         areas_index: str = DEFAULT_AREAS_INDEX,
         contingencies_index: str = DEFAULT_CONTINGENCIES_INDEX,
         remedial_actions_index: str = DEFAULT_REMEDIAL_ACTIONS_INDEX,
@@ -80,8 +76,6 @@ class CardDataEnricher:
     ):
         """Store Elastic/index settings and initialize per-run lookup caches."""
         self.elastic = elastic
-        self.debug_s3 = debug_s3
-        self.debug_dump_bucket_name = debug_dump_bucket_name
         self.areas_index = areas_index
         self.contingencies_index = contingencies_index
         self.remedial_actions_index = remedial_actions_index
@@ -164,57 +158,11 @@ class CardDataEnricher:
         }
         if self.enrichment_verbose_logging:
             logger.debug(f"[Card id={self._process_instance_id}] Priming enrichment cache from {index} for query period {query_period_start.isoformat()} - {query_period_end.isoformat()}")
-        hits = self.elastic.get_docs_by_query(index=index, query=query, size=500, return_df=True)
-        logger.info(
-            f"[Raw Elastic response type: {type(hits)}, keys: {hits.keys() if isinstance(hits, dict) else 'N/A'}], shape: {hits.shape}")
-        logger.info(f"raw indices: {self.elastic.client.indices.resolve_index(name=index)}")
-        if isinstance(hits, dict) and 'hits' in hits:
-            logger.info(f"[Hits total: {hits['hits']['total']}, returned count: {len(hits['hits']['hits'])}]")
+        hits = self.elastic.get_docs_by_query(index=index, query=query, size=5000, return_df=False)
         docs = self._extract_source_docs(hits)
         if self.enrichment_verbose_logging:
             logger.debug(f"[Card id={self._process_instance_id}] Loaded {len(docs)} documents from {index}")
-        if index == self.contingencies_index:
-            self._dump_contingencies_query_result(
-                query_period_start=query_period_start,
-                query_period_end=query_period_end,
-                documents=docs,
-            )
         return docs
-
-    def _dump_contingencies_query_result(
-        self,
-        query_period_start: datetime,
-        query_period_end: datetime,
-        documents: list[dict[str, Any]],
-    ) -> None:
-        """Log and persist the raw csa-contingencies query result for debugging."""
-        if not self.debug_s3 or not self.debug_dump_bucket_name:
-            return
-
-        payload = {
-            "processInstanceId": self._process_instance_id,
-            "queryPeriodStart": query_period_start.isoformat(),
-            "queryPeriodEnd": query_period_end.isoformat(),
-            "index": self.contingencies_index,
-            "count": len(documents),
-            "documents": documents,
-        }
-        serialized = json.dumps(payload, ensure_ascii=False, indent=2, default=str)
-        logger.info(
-            "csa-contingencies query result for processInstanceId={}:\n{}",
-            self._process_instance_id,
-            serialized,
-        )
-        buffer = BytesIO(serialized.encode("utf-8"))
-        buffer.name = f"opcoord/debug/{self._process_instance_id}/csa-contingencies-query.json"
-        self.debug_s3.upload_object(
-            file_path_or_file_object=buffer,
-            bucket_name=self.debug_dump_bucket_name,
-        )
-        logger.info(
-            "Uploaded csa-contingencies debug payload to S3 at path: {}",
-            buffer.name,
-        )
 
     def _enrich_base_case_power_flow_results(self, payload: dict[str, Any]) -> None:
         """Add reported area names to SAR base-case power-flow results."""
