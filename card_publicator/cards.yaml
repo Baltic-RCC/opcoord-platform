@@ -16,7 +16,6 @@ ras:
   title: {"key": "choiceQuestionProcess.title"}
   summary: {"key": "choiceQuestionProcess.summary"}
   groupRecipients: ["ADMIN"]
-  actions: ["KEEP_CHILD_CARDS"]
   entityRecipients: [
     "ENTITY1_FR",
     "BRCC"]
