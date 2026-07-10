@@ -15,11 +15,9 @@ ras:
   severity: "ACTION"
   title: {"key": "choiceQuestionProcess.title"}
   summary: {"key": "choiceQuestionProcess.summary"}
-  groupRecipients: ["ADMIN"]
   entityRecipients: [
     "ENTITY1_FR",
-    "BRCC"]
+    "38X-BALTIC-RSC-H"]
   entitiesAllowedToRespond: [
     "ENTITY1_FR",
-    "BRCC"
-  ]
+    "38X-BALTIC-RSC-H"]
