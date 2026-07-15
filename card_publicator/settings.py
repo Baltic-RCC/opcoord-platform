@@ -19,7 +19,7 @@ class BusinessSettings(BaseSettings):
                                       extra="ignore")
 
     cards_index: str = "dev-opcoord-cards"
-    publisher: str = "brcc"
+    publisher: str = "martynas"
     enable_s3_content_storage: bool = True
     s3_bucket_name: str = "analyses"
     debug: bool = False
