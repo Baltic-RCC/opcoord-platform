@@ -10,11 +10,11 @@ sar:
 
 ras:
   processVersion: "1"
-  process: "ra-coordination"
+  process: "ra_coordination"
   state: "proposed"
   severity: "ACTION"
-  title: {"key": "ra-coordination.title"}
-  summary: {"key": "ra-coordination.summary"}
+  title: {"key": "ra_coordination.title"}
+  summary: {"key": "ra_coordination.summary"}
   entityRecipients: [
     "ENTITY1_FR",
     "38X-BALTIC-RSC-H"]
