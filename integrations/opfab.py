@@ -186,11 +186,11 @@ class AuthenticatedSession:
         return response
 
     def create_perimeter(self, perimeter_json=None, **kwargs):
-        endpoint_url = f"{self.base_url}:2103/perimeters"
+        endpoint_url = f"{self.base_url}/users/perimeters"
         return self.request("POST", url=endpoint_url, json=perimeter_json, **kwargs)
 
     def add_perimeter_to_group(self, perimeter_id: str, group_name: str, **kwargs):
-        endpoint_url = f"{self.base_url}:2103/perimeters/{perimeter_id}/groups"
+        endpoint_url = f"{self.base_url}/users/perimeters/{perimeter_id}/groups"
         payload = [group_name]
         return self.request("PUT", url=endpoint_url, json=payload, **kwargs)
 
