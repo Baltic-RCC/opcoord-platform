@@ -1,0 +1,105 @@
+{
+    "publisher": "38X-BALTIC-RSC-H",
+    "publisherType": "ENTITY",
+    "process": "ra_coordination",
+    "processVersion": "1",
+    "processInstanceId": "ras-test-2026-07-20-002",
+    "state": "proposed",
+    "startDate": 1784548800000,
+    "severity": "ACTION",
+    "title": {
+        "key": "ra_coordination.title"
+    },
+    "summary": {
+        "key": "ra_coordination.summary"
+    },
+    "entityRecipients": [
+        "38X-BALTIC-RSC-H",
+        "AST_ID",
+        "LITGRID_ID",
+        "ELERING_ID"
+    ],
+    "entitiesAllowedToRespond": [
+        "AST_ID",
+        "LITGRID_ID"
+    ],
+    "entitiesRequiredToRespond": [
+        "ELERING_ID"
+    ],
+    "data": {
+        "step": "RCC RA PROPOSAL",
+        "question": "Do you approve the following proposed remedial action?",
+        "RemedialActionSchedule": [
+            {
+                "@type": "RemedialActionSchedule",
+                "@id": "_ras-test-001",
+                "mRID": "ras-test-001",
+                "description": "Reduce transfer on test corridor",
+                "statusKind": "RemedialActionScheduleStatusKind.proposed",
+                "Contingency": "CONTINGENCY-TEST-001",
+                "RemedialAction": "REMEDIAL-ACTION-TEST-001",
+                "GridStateIntensitySchedule": [
+                    {
+                        "@type": "GridStateIntensitySchedule",
+                        "@id": "_gsi-test-001",
+                        "mRID": "gsi-test-001",
+                        "GenericValueTimePoint": [
+                            {
+                                "atTime": "2026-07-20T10:00:00Z",
+                                "value": "1.0"
+                            },
+                            {
+                                "atTime": "2026-07-20T12:00:00Z",
+                                "value": "0.8"
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "@type": "RemedialActionSchedule",
+                "@id": "_ras-test-002",
+                "mRID": "ras-test-002",
+                "description": "Increase support on test corridor",
+                "statusKind": "RemedialActionScheduleStatusKind.proposed",
+                "Contingency": "CONTINGENCY-TEST-002",
+                "RemedialAction": "REMEDIAL-ACTION-TEST-002",
+                "GridStateIntensitySchedule": [
+                    {
+                        "@type": "GridStateIntensitySchedule",
+                        "@id": "_gsi-test-002",
+                        "mRID": "gsi-test-002",
+                        "GenericValueTimePoint": [
+                            {
+                                "atTime": "2026-07-20T11:00:00Z",
+                                "value": "0.6"
+                            },
+                            {
+                                "atTime": "2026-07-20T13:00:00Z",
+                                "value": "0.9"
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+        "violations": [
+            {
+                "id": "violation-test-001",
+                "name": "TEST_CORRIDOR_01",
+                "initial_flow": 980,
+                "post_flow": 1120,
+                "loading_percent": 112,
+                "contingency": "CONTINGENCY-TEST-001"
+            },
+            {
+                "id": "violation-test-002",
+                "name": "TEST_CORRIDOR_02",
+                "initial_flow": 760,
+                "post_flow": 1015,
+                "loading_percent": 108,
+                "contingency": "CONTINGENCY-TEST-002"
+            }
+        ]
+    }
+}
