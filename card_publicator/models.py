@@ -19,6 +19,7 @@ class Card(BaseModel):
     entityRecipients: Optional[List[str]] = None
     userRecipients: Optional[List[str]] = None
     entitiesAllowedToRespond: Optional[List[str]] = None
+    entitiesRequiredToRespond: Optional[List[str]] = None
     endDate: Optional[datetime] = None
     expirationDate: Optional[datetime] = None
     tag: Optional[str] = None
