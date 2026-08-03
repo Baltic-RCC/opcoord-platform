@@ -58,8 +58,14 @@ class RasProfileCardBuilder:
             key_mode="local",
         )
 
+        # Keep static RAS presentation fields beside the native converted data.
+        ras_data = {**config["ras"].get("data", {}), **converted}
+
         # Build card using config and converted data
-        card = Card(**config["ras"], **card_fields, data=converted)
+        # Profile configuration supplies static card fields such as publisher;
+        # runtime fields still provide dates and the process instance id.
+        ras_config = {**card_fields, **config["ras"], "data": ras_data}
+        card = Card(**ras_config)
 
         return card
 
