@@ -144,7 +144,15 @@ if __name__ == "__main__":
     TEST_PROFILE = "SAR"  # SAR or RAS, used in BUILD mode
 
     project_root = Path(__file__).parent.parent
-    nc_input_path = project_root / "tests" / "data" / f"nc_{TEST_PROFILE.lower()}.xml"
+    NC_INPUT_PATHS = {
+        "SAR": project_root / "tests" / "kevin" / "SAR_20260520T1130_ID_1.xml",
+        "RAS": project_root / "tests" / "data" / "nc_ras.xml",
+    }
+    try:
+        nc_input_path = NC_INPUT_PATHS[TEST_PROFILE.upper()]
+    except KeyError as error:
+        raise ValueError(f"Unsupported TEST_PROFILE: {TEST_PROFILE}") from error
+
     prebuilt_card_path = project_root / "tests" / "payload" / "RAS_payload.json"
 
     save_built_card = True

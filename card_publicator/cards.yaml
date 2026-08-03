@@ -1,5 +1,6 @@
 
 sar:
+  publisherType: "ENTITY"
   processVersion: "1"
   process: "crosa"
   state: "sar"
