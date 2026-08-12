@@ -29,6 +29,7 @@ jobs:
         run: |
           echo "PUBLICATOR=opcoord-card-publicator" >> $GITHUB_ENV
           echo "RETRIEVER=opcoord-card-retriever" >> $GITHUB_ENV
+          echo "EXCHANGE=opcoord-business-data-exchange" >> $GITHUB_ENV
           echo "DATE_TAG=$(date +%Y%m%d%H%M)" >> $GITHUB_ENV
           echo "LATEST_TAG=latest" >> $GITHUB_ENV
           echo "BASE_IMAGE_TAG=${{ github.event.inputs.base_image_tag || 'latest' }}" >> $GITHUB_ENV
@@ -73,3 +74,12 @@ jobs:
           tags: |
             ${{ vars.DOCKER_USERNAME }}/${{ env.RETRIEVER }}:${{ env.IMAGE_TAG }}
             ${{ vars.DOCKER_USERNAME }}/${{ env.RETRIEVER }}:${{ env.LATEST_TAG }}
+
+      - uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: business_data_exchange/Dockerfile
+          push: true
+          tags: |
+            ${{ vars.DOCKER_USERNAME }}/${{ env.EXCHANGE }}:${{ env.IMAGE_TAG }}
+            ${{ vars.DOCKER_USERNAME }}/${{ env.EXCHANGE }}:${{ env.LATEST_TAG }}
