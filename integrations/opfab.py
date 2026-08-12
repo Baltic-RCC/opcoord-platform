@@ -185,6 +185,42 @@ class AuthenticatedSession:
 
         return response
 
+    # ------------------------------------------------------------------ #
+    # Business data management (businessconfig/businessData)             #
+    # ------------------------------------------------------------------ #
+    def get_business_data_resources(self, **kwargs) -> list:
+        """List all business data resource names stored in businessconfig service."""
+        endpoint_url = f"{self.base_url}/businessconfig/businessData"
+        response = self.request("GET", url=endpoint_url, **kwargs)
+        return response.json()
+
+    def get_business_data(self, resource_name: str, **kwargs):
+        """Get one business data resource (json) by name."""
+        endpoint_url = f"{self.base_url}/businessconfig/businessData/{resource_name}"
+        response = self.request("GET", url=endpoint_url, **kwargs)
+        return response.json()
+
+    def upload_business_data(self, resource_name: str, data: dict, **kwargs):
+        """Create or update a business data resource (json file) by name.
+
+        Businessconfig service validates that the uploaded file is valid json.
+        POST creates the resource; if it already exists, fall back to PUT to update it.
+        """
+        endpoint_url = f"{self.base_url}/businessconfig/businessData/{resource_name}"
+        payload = json.dumps(data, default=str, ensure_ascii=False).encode()
+        files = {"file": (f"{resource_name}.json", payload, "application/json")}
+        try:
+            return self.request("POST", url=endpoint_url, files=files, **kwargs)
+        except requests.HTTPError:
+            logger.warning(f"POST of business data '{resource_name}' failed, retrying with PUT (update)")
+            files = {"file": (f"{resource_name}.json", payload, "application/json")}
+            return self.request("PUT", url=endpoint_url, files=files, **kwargs)
+
+    def delete_business_data(self, resource_name: str, **kwargs):
+        """Delete one business data resource by name."""
+        endpoint_url = f"{self.base_url}/businessconfig/businessData/{resource_name}"
+        return self.request("DELETE", url=endpoint_url, **kwargs)
+
     def create_perimeter(self, perimeter_json=None, **kwargs):
         endpoint_url = f"{self.base_url}/users/perimeters"
         return self.request("POST", url=endpoint_url, json=perimeter_json, **kwargs)
