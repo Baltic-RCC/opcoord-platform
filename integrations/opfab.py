@@ -162,6 +162,37 @@ class AuthenticatedSession:
         endpoint_url = f"{self.base_url}/cards-consultation/cards/{card_id}"
         return self.request("GET", url=endpoint_url, **kwargs)
 
+    def search_cards(
+        self,
+        filters: list[dict],
+        *,
+        page: int = 0,
+        size: int = 100,
+        selected_fields: list[str] | None = None,
+        **kwargs,
+    ):
+        """Return light cards visible to this OperatorFabric user."""
+
+        endpoint_url = f"{self.base_url}/cards-consultation/cards"
+        payload = {
+            "page": page,
+            "size": size,
+            "adminMode": False,
+            "includeChildCards": False,
+            "latestUpdateOnly": True,
+            "filters": filters,
+            "selectedFields": selected_fields
+            or [
+                "id",
+                "process",
+                "state",
+                "processInstanceId",
+                "startDate",
+                "publishDate",
+            ],
+        }
+        return self.request("POST", url=endpoint_url, json=payload, **kwargs)
+
     def post_process_bundle(self, bundle_folder_name: str, **kwargs):
         # Package the bundle directory into a tar.gz archive
         bundle_dir = Path(bundle_folder_name)
