@@ -10,7 +10,6 @@ sar:
   groupRecipients: ["ADMIN"]
 
 ras:
-  publisher: "38X-BALTIC-RSC-H"
   processVersion: "1"
   process: "ra_coordination"
   state: "proposed"
@@ -18,15 +17,7 @@ ras:
   title: {"key": "ra_coordination.title"}
   summary: {"key": "ra_coordination.summary"}
   publisherType: "ENTITY"
-  entityRecipients: [
-    "38X-BALTIC-RSC-H",
-    "AST_ID",
-    "LITGRID_ID",
-    "ELERING_ID"]
-  entitiesAllowedToRespond: [
-    "AST_ID",
-    "LITGRID_ID"]
-  entitiesRequiredToRespond: ["ELERING_ID"]
+  actions: ["KEEP_CHILD_CARDS"]
   data:
     step: "RCC RA PROPOSAL"
     question: "Do you approve the following proposed remedial action?"

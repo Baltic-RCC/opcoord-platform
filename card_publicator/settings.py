@@ -4,6 +4,7 @@ import uuid
 from pathlib import Path
 from pydantic import BaseModel, Field
 from pydantic_settings import SettingsConfigDict, BaseSettings
+from typing import ClassVar
 from config.integrations import ElasticSettings, RabbitMqSettings, MinioSettings
 
 
@@ -19,7 +20,7 @@ class BusinessSettings(BaseSettings):
                                       extra="ignore")
 
     cards_index: str = "dev-opcoord-cards"
-    publisher: str = "martynas"
+    publisher: ClassVar[str] = "38X-BALTIC-RSC-H"
     enable_s3_content_storage: bool = True
     s3_bucket_name: str = "analyses"
     debug: bool = False

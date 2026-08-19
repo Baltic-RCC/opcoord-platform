@@ -21,7 +21,6 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal
 
-import pytz
 from loguru import logger
 
 from integrations.elastic import Elastic
@@ -319,17 +318,16 @@ class CardDataEnricher:
     def _sar_query_period(
         payload: dict[str, Any],
     ) -> tuple[datetime, datetime]:
-        """Compute a 30-minute UTC window around SAR scenarioTime."""
+        """Compute a 30-minute UTC window around SAR scenarioTime.
 
+        Only UTC time is supported.
+        """
         for full_model in CardDataEnricher._section_items(payload, "FullModel"):
             scenario_time = full_model.get("scenarioTime")
             if scenario_time:
-                if isinstance(scenario_time, str):
-                    scenario_time = datetime.fromisoformat(scenario_time)
-                # Naive scenario times are interpreted as CET/CEST.
-                if scenario_time.tzinfo is None:
-                    scenario_time = pytz.timezone("CET").localize(scenario_time)
-                scenario_time = scenario_time.astimezone(UTC)
+                scenario_time = datetime.fromisoformat(scenario_time)
+                if scenario_time.utcoffset() != timedelta(0):
+                    raise ValueError("FullModel.scenarioTime must be expressed in UTC")
                 return (
                     scenario_time - timedelta(minutes=30),
                     scenario_time + timedelta(minutes=30),
@@ -347,10 +345,15 @@ class CardDataEnricher:
             start_date_raw = full_model.get("startDate")
             end_date_raw = full_model.get("endDate")
             if start_date_raw and end_date_raw:
-                return (
-                    datetime.fromisoformat(start_date_raw),
-                    datetime.fromisoformat(end_date_raw),
-                )
+                start_date = datetime.fromisoformat(start_date_raw)
+                if start_date.utcoffset() != timedelta(0):
+                    raise ValueError("RAS FullModel.startDate must be expressed in UTC")
+
+                end_date = datetime.fromisoformat(end_date_raw)
+                if end_date.utcoffset() != timedelta(0):
+                    raise ValueError("RAS FullModel.endDate must be expressed in UTC")
+
+                return start_date, end_date
 
         raise ValueError(
             "FullModel.startDate and FullModel.endDate are required "

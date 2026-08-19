@@ -23,6 +23,11 @@ class CardFactory:
         builder = self._builders[card_type]
         return builder.build(content=data, card_fields=card_fields)
 
+    def apply_post_enrichment_fields(self, card_type: str, card: Card) -> None:
+        """Apply profile fields that are only available after enrichment."""
+
+        if card_type == "ras":
+            self._builders[card_type].apply_target_tso_routing(card)
 
 class SarProfileCardBuilder:
     def __init__(self):
@@ -61,14 +66,26 @@ class RasProfileCardBuilder:
         # Keep static RAS presentation fields beside the native converted data.
         ras_data = {**config["ras"].get("data", {}), **converted}
 
-        # Build card using config and converted data
-        # Profile configuration supplies static card fields such as publisher;
-        # runtime fields still provide dates and the process instance id.
+        # Build card using config, runtime fields, and converted data.
         ras_config = {**card_fields, **config["ras"], "data": ras_data}
         card = Card(**ras_config)
 
         return card
 
+    @staticmethod
+    def apply_target_tso_routing(card: Card) -> None:
+        """Route one RAS proposal to the schedule's operating TSO and the publisher.
+
+        The current 1D RAS message contract contains one schedule. Supporting
+        several schedules is intentionally left to a future builder design.
+        """
+
+        schedules = card.data["RemedialActionSchedule"][0]
+        target_entity = schedules["RemedialActionOperatorEIC"]
+        card.data["targetEntity"] = target_entity
+        card.entityRecipients = [card.publisher, target_entity]
+        card.entitiesAllowedToRespond = [target_entity]
+        card.entitiesRequiredToRespond = [target_entity]
 
 if __name__ == '__main__':
     # Testing
