@@ -9,13 +9,14 @@ The enrichment pipeline is profile-aware:
         -> enrich the profile-specific sections
         -> clear the caches
 
-RAS enrichment uses Elastic for reference data only. The NC report itself is
-converted by the builders before this class is called.
+RAS enrichment also links loading violations from the CSA branch-results index.
+The NC report itself is converted by the builders before this class is called.
 """
 
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -25,9 +26,17 @@ from loguru import logger
 
 from integrations.elastic import Elastic
 
+try:
+    from .rdf_converter import convert_cim_rdf_to_json
+except ImportError:  # Support the existing direct-module imports used by the workers.
+    from rdf_converter import convert_cim_rdf_to_json
+
 DEFAULT_AREAS_INDEX = "config-areas"
 DEFAULT_CONTINGENCIES_INDEX = "csa-contingencies*"
 DEFAULT_REMEDIAL_ACTIONS_INDEX = "csa-remedial-actions*"
+DEFAULT_BRANCH_RESULTS_INDEX = "csa-branch-results-*"
+DEFAULT_BRANCH_RESULTS_SOURCE_MODULE = "crosa"
+BASE_CASE_INDEXING_THRESHOLD_PERCENT = 80
 
 NCProfileType = Literal["RAS", "SAR"]
 
@@ -95,6 +104,8 @@ class CardDataEnricher:
         areas_index: str = DEFAULT_AREAS_INDEX,
         contingencies_index: str = DEFAULT_CONTINGENCIES_INDEX,
         remedial_actions_index: str = DEFAULT_REMEDIAL_ACTIONS_INDEX,
+        branch_results_index: str = DEFAULT_BRANCH_RESULTS_INDEX,
+        branch_results_source_module: str = DEFAULT_BRANCH_RESULTS_SOURCE_MODULE,
         enrichment_strict: bool | None = None,
         enrichment_verbose_logging: bool | None = None,
     ):
@@ -104,11 +115,14 @@ class CardDataEnricher:
         self.areas_index = areas_index
         self.contingencies_index = contingencies_index
         self.remedial_actions_index = remedial_actions_index
+        self.branch_results_index = branch_results_index
+        self.branch_results_source_module = branch_results_source_module
         self.enrichment_strict = enrichment_strict
         self.enrichment_verbose_logging = enrichment_verbose_logging
         self._areas_cache: list[dict[str, Any]] = []
         self._contingencies_cache: list[dict[str, Any]] = []
         self._remedial_actions_cache: list[dict[str, Any]] = []
+        self._ras_branch_results_cache: list[dict[str, Any]] = []
 
     def enrich(
         self,
@@ -165,6 +179,7 @@ class CardDataEnricher:
 
         if profile_type == "RAS":
             self._enrich_remedial_action_schedules(payload)
+            self._enrich_ras_linked_violations(payload)
         elif profile_type == "SAR":
             self._enrich_base_case_power_flow_results(payload)
             self._enrich_contingency_power_flow_results(payload)
@@ -229,6 +244,7 @@ class CardDataEnricher:
                 query_period_start=query_period_start,
                 query_period_end=query_period_end,
             )
+            self._ras_branch_results_cache = self._query_ras_branch_results(payload)
 
     def _clear_enrichment_cache(self) -> None:
         """Clear all temporary enrichment caches to free memory."""
@@ -236,6 +252,64 @@ class CardDataEnricher:
         self._areas_cache = []
         self._contingencies_cache = []
         self._remedial_actions_cache = []
+        self._ras_branch_results_cache = []
+
+    def _query_ras_branch_results(
+        self,
+        payload: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        """Load target-contingency and base-case branch rows for one RAS."""
+
+        schedule = self._single_ras_schedule(payload)
+        contingency_id = self._normalize_identifier(schedule.get("Contingency"))
+        if not contingency_id:
+            raise ValueError("RAS RemedialActionSchedule.Contingency is required")
+
+        full_model = self._single_full_model(payload)
+        time_horizon, run_id = self._ras_run_parts(full_model.get("wasGeneratedBy"))
+        scenario_times = [
+            self._utc_text(value) for value in self._ras_scenario_midpoints(payload)
+        ]
+
+        filters: list[dict[str, Any]] = [
+            {"terms": {"@scenario_timestamp": scenario_times}},
+            {"term": {"@time_horizon.keyword": time_horizon}},
+            {"term": {"metadata.run_id.keyword": run_id}},
+            {
+                "term": {
+                    "metadata.source_module.keyword": (
+                        self.branch_results_source_module.lower()
+                    )
+                }
+            },
+            {
+                "terms": {
+                    "contingency_id.keyword": [
+                        "",
+                        contingency_id,
+                        f"_{contingency_id}",
+                    ]
+                }
+            },
+        ]
+        version = full_model.get("version")
+        if version is not None:
+            filters.append({"term": {"@version": version}})
+
+        query = {"bool": {"filter": filters}}
+        self._log_query_start(
+            self.branch_results_index,
+            f" for RAS contingency {contingency_id}",
+        )
+        hits = self.elastic.get_docs_by_query(
+            index=self.branch_results_index,
+            query=query,
+            size=5000,
+            return_df=False,
+        )
+        docs = self._extract_source_docs(hits)
+        self._log_query_result(self.branch_results_index, len(docs))
+        return docs
 
     def _query_areas_index(self, index: str) -> list[dict[str, Any]]:
         """Load area and party documents from the configured areas index."""
@@ -412,6 +486,75 @@ class CardDataEnricher:
             self._add_proposed_by_name(schedule, "ProposingEntity")
             self._add_contingency_fields(schedule)
             self._add_remedial_action_fields(schedule)
+
+    def _enrich_ras_linked_violations(self, payload: dict[str, Any]) -> None:
+        """Build RAS loading-violation rows from cached Elastic branch results."""
+
+        schedule = self._single_ras_schedule(payload)
+        contingency_id = self._normalize_identifier(schedule.get("Contingency"))
+        target_results = [
+            result
+            for result in self._ras_branch_results_cache
+            if self._normalize_identifier(result.get("contingency_id"))
+            == contingency_id
+            and self._as_bool(result.get("is_violation"))
+        ]
+        base_results = [
+            result
+            for result in self._ras_branch_results_cache
+            if not self._normalize_identifier(result.get("contingency_id"))
+        ]
+        base_by_result_key = {
+            self._branch_result_key(result): result for result in base_results
+        }
+
+        violations = []
+        for result in target_results:
+            winding = self._most_loaded_winding(result)
+            base_result = base_by_result_key.get(self._branch_result_key(result))
+            base_case_found = base_result is not None
+            violations.append(
+                {
+                    "id": (
+                        f"{result.get('subject_id')}:{result.get('contingency_id')}"
+                    ),
+                    "elementId": result.get("subject_id"),
+                    "elementName": result.get("subject_name"),
+                    "elementType": result.get("subject_type"),
+                    "measurementType": "CURRENT",
+                    "winding": winding,
+                    "initialValue": (
+                        base_result.get(f"i{winding}") if base_result else None
+                    ),
+                    "initialLoadingPercent": (
+                        base_result.get(f"loading_percent{winding}")
+                        if base_result
+                        else None
+                    ),
+                    "baseCaseFound": base_case_found,
+                    "baseCaseThresholdPercent": BASE_CASE_INDEXING_THRESHOLD_PERCENT,
+                    "postContingencyValue": result.get(f"i{winding}"),
+                    "unit": "A",
+                    "loadingPercent": result.get(f"loading_percent{winding}"),
+                    "operationalLimit": result.get(f"limit{winding}"),
+                    "atTime": result.get("@scenario_timestamp"),
+                    "contingency": result.get("contingency_id"),
+                    "contingencyName": result.get("contingency_name"),
+                }
+            )
+
+        payload["violations"] = violations
+        if violations:
+            logger.info(
+                "Linked {} Elastic loading violation(s) to RAS contingency {}",
+                len(violations),
+                contingency_id,
+            )
+        else:
+            logger.warning(
+                "No Elastic loading violations matched RAS contingency {}",
+                contingency_id,
+            )
 
     # -----------------------------------------------------------------------
     # Area and party lookups
@@ -686,6 +829,118 @@ class CardDataEnricher:
         return None
 
     # -----------------------------------------------------------------------
+    # RAS branch-result matching utilities
+    # -----------------------------------------------------------------------
+
+    @classmethod
+    def _single_full_model(cls, payload: dict[str, Any]) -> dict[str, Any]:
+        """Return the single FullModel object required by NC card payloads."""
+
+        full_models = cls._section_items(payload, "FullModel")
+        if len(full_models) != 1:
+            raise ValueError("RAS enrichment requires exactly one FullModel")
+        return full_models[0]
+
+    @classmethod
+    def _single_ras_schedule(cls, payload: dict[str, Any]) -> dict[str, Any]:
+        """Return the one schedule supported by the current RAS card contract."""
+
+        schedules = cls._section_items(payload, "RemedialActionSchedule")
+        if len(schedules) != 1:
+            raise ValueError(
+                "RAS linked-violation enrichment requires exactly one schedule"
+            )
+        return schedules[0]
+
+    @classmethod
+    def _ras_scenario_midpoints(cls, payload: dict[str, Any]) -> list[datetime]:
+        """Return the SAR/Elastic midpoint corresponding to every RAS hour."""
+
+        full_model = cls._single_full_model(payload)
+        start = cls._utc_datetime(full_model.get("startDate"), "startDate")
+        end = cls._utc_datetime(full_model.get("endDate"), "endDate")
+        duration = end - start
+        if duration <= timedelta(0) or duration % timedelta(hours=1):
+            raise ValueError("RAS FullModel interval must contain complete hourly slots")
+
+        scenarios = []
+        slot_start = start
+        while slot_start < end:
+            scenarios.append(slot_start + timedelta(minutes=30))
+            slot_start += timedelta(hours=1)
+        return scenarios
+
+    @staticmethod
+    def _ras_run_parts(was_generated_by: Any) -> tuple[str, str]:
+        """Extract time horizon and run ID from values such as CSA-1D-00-RAS."""
+
+        parts = str(was_generated_by or "").strip().split("-")
+        if parts and parts[-1].upper() in {"RAS", "SAR"}:
+            parts.pop()
+        if len(parts) < 3:
+            raise ValueError(
+                "Cannot derive time horizon and run ID from FullModel.wasGeneratedBy"
+            )
+        return parts[-2].upper(), parts[-1]
+
+    @staticmethod
+    def _utc_datetime(value: Any, field_name: str) -> datetime:
+        """Parse one required UTC model timestamp."""
+
+        if not value:
+            raise ValueError(f"RAS FullModel.{field_name} is required")
+        parsed = value if isinstance(value, datetime) else datetime.fromisoformat(str(value))
+        if parsed.utcoffset() != timedelta(0):
+            raise ValueError(f"RAS FullModel.{field_name} must be expressed in UTC")
+        return parsed.astimezone(UTC)
+
+    @staticmethod
+    def _utc_text(value: datetime) -> str:
+        """Serialize a UTC timestamp in the form used by Elastic date terms."""
+
+        return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
+
+    @staticmethod
+    def _normalize_identifier(value: Any) -> str:
+        """Normalize CIM/Elastic identifiers for comparisons."""
+
+        return str(value or "").strip().lstrip("#_")
+
+    @staticmethod
+    def _branch_result_key(result: dict[str, Any]) -> tuple[Any, ...]:
+        """Identify equivalent base and contingency rows from one CSA run."""
+
+        metadata = result.get("metadata") or {}
+        return (
+            CardDataEnricher._normalize_identifier(result.get("subject_id")),
+            result.get("@scenario_timestamp"),
+            metadata.get("source_module"),
+            metadata.get("project_name"),
+            result.get("@version"),
+        )
+
+    @staticmethod
+    def _most_loaded_winding(result: dict[str, Any]) -> int:
+        """Return the winding number with the highest post-contingency loading."""
+
+        loading_by_winding = {
+            winding: result.get(f"loading_percent{winding}")
+            for winding in (1, 2, 3)
+            if result.get(f"loading_percent{winding}") is not None
+        }
+        if not loading_by_winding:
+            raise ValueError(
+                f"Branch result {result.get('subject_id')} has no loading percentages"
+            )
+        return max(loading_by_winding, key=loading_by_winding.get)
+
+    @staticmethod
+    def _as_bool(value: Any) -> bool:
+        """Accept native and string booleans returned by different clients."""
+
+        return value is True or str(value).strip().lower() == "true"
+
+    # -----------------------------------------------------------------------
     # Shared response and payload utilities
     # -----------------------------------------------------------------------
 
@@ -792,56 +1047,99 @@ class CardDataEnricher:
             raise ValueError(message)
 
 
-if __name__ == "__main__":
-    from card_publicator.rdf_converter import convert_cim_rdf_to_json
+def enrich_nc_xml_file(
+    input_path: str | Path,
+    output_path: str | Path,
+    *,
+    enrichment_strict: bool = False,
+    enrichment_verbose_logging: bool = True,
+    indent: int = 2,
+    root_classes: tuple[str, ...] = (
+        "BaseCasePowerFlowResult",
+        "ContingencyPowerFlowResult",
+        "RemedialActionSchedule",
+    ),
+    elastic: Elastic | None = None,
+) -> dict[str, Any]:
+    """Convert, enrich, and save one NC XML payload.
 
-    def enrich_nc_xml_file(
-        input_path: str = (
-            "C:/Users/lukas.navickas/Documents/Opcoord_testing/"
-            "example_cards/SAR_20260708T2030_1D_1_"
-            "a753f34b-4f07-49a3-8335-8ff9c0e8f907.xml"
-        ),
-        output_path: str = (
-            "C:/Users/lukas.navickas/Documents/Opcoord_testing/"
-            "enriched_cards/enriched_card_sar_ID_test.json"
-        ),
-        enrichment_strict: bool = False,
-        enrichment_verbose_logging: bool = True,
-        indent: int = 2,
-    ) -> dict[str, Any]:
-        """Convert one local NC XML card, enrich it, and write the result."""
+    ``input_path`` and ``output_path`` are explicit so this helper can be
+    reused from any developer machine or test. Pass an existing ``elastic``
+    client when the caller already owns one; otherwise a client is created
+    using the normal application configuration.
+    """
+    input_path = Path(input_path)
+    output_path = Path(output_path)
 
-        # This helper is only for manual testing. Production code should use
-        # CardDataEnricher directly after the payload has been converted.
-        input_path = Path(input_path)
-        output_path = Path(output_path)
-
-        with input_path.open("r", encoding="utf-8") as input_file:
-            payload = convert_cim_rdf_to_json(
-                input_file.read(),
-                root_class=[
-                    "BaseCasePowerFlowResult",
-                    "ContingencyPowerFlowResult",
-                    "RemedialActionSchedule",
-                ],
-                key_mode="local",
-            )
-
-        enricher = CardDataEnricher(
-            elastic=Elastic(debug=enrichment_verbose_logging),
-            areas_index=DEFAULT_AREAS_INDEX,
-            contingencies_index=DEFAULT_CONTINGENCIES_INDEX,
-            remedial_actions_index=DEFAULT_REMEDIAL_ACTIONS_INDEX,
-            enrichment_strict=enrichment_strict,
-            enrichment_verbose_logging=enrichment_verbose_logging,
+    with input_path.open("r", encoding="utf-8") as input_file:
+        payload = convert_cim_rdf_to_json(
+            input_file.read(),
+            root_class=list(root_classes),
+            key_mode="local",
         )
-        enricher.enrich(payload)
 
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        with output_path.open("w", encoding="utf-8") as output_file:
-            json.dump(payload, output_file, ensure_ascii=False, indent=indent)
-            output_file.write("\n")
+    enricher = CardDataEnricher(
+        elastic=elastic if elastic is not None else Elastic(debug=enrichment_verbose_logging),
+        areas_index=DEFAULT_AREAS_INDEX,
+        contingencies_index=DEFAULT_CONTINGENCIES_INDEX,
+        remedial_actions_index=DEFAULT_REMEDIAL_ACTIONS_INDEX,
+        enrichment_strict=enrichment_strict,
+        enrichment_verbose_logging=enrichment_verbose_logging,
+    )
+    enricher.enrich(payload)
 
-        return payload
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w", encoding="utf-8") as output_file:
+        json.dump(payload, output_file, ensure_ascii=False, indent=indent)
+        output_file.write("\n")
 
-    enrich_nc_xml_file()
+    return payload
+
+
+def main() -> None:
+    """Run the reusable local enrichment example.
+
+    The defaults point to repository-local fixtures. Developers can select a
+    profile or provide their own paths without changing this file by setting
+    ``ENRICHMENT_PROFILE``, ``ENRICHMENT_INPUT_PATH``, or
+    ``ENRICHMENT_OUTPUT_PATH`` in the VS Code launch environment.
+    Relative override paths are resolved from the repository root.
+    """
+    project_root = Path(__file__).resolve().parents[1]
+    profile = os.getenv("ENRICHMENT_PROFILE", "SAR").upper()
+
+    default_input_paths = {
+        "SAR": project_root / "tests" / "data" / "nc_sar.xml",
+        "RAS": project_root / "tests" / "data" / "nc_ras.xml",
+    }
+    default_output_paths = {
+        "SAR": project_root / "tests" / "payload" / "enriched_sar.json",
+        "RAS": project_root / "tests" / "payload" / "enriched_ras.json",
+    }
+
+    if profile not in default_input_paths:
+        raise ValueError(
+            f"Unsupported ENRICHMENT_PROFILE: {profile}. Expected SAR or RAS."
+        )
+
+    def resolve_path(environment_name: str, default_path: Path) -> Path:
+        configured_path = os.getenv(environment_name)
+        if not configured_path:
+            return default_path
+        path = Path(configured_path)
+        return path if path.is_absolute() else project_root / path
+
+    enrich_nc_xml_file(
+        input_path=resolve_path(
+            "ENRICHMENT_INPUT_PATH",
+            default_input_paths[profile],
+        ),
+        output_path=resolve_path(
+            "ENRICHMENT_OUTPUT_PATH",
+            default_output_paths[profile],
+        ),
+    )
+
+
+if __name__ == "__main__":
+    main()

@@ -10,7 +10,6 @@ from integrations import elastic, opfab, s3_storage
 from loguru import logger
 import settings
 from enrichment import CardDataEnricher
-from ras_linked_violations import RasLinkedViolationEnricher
 
 
 conf = settings.get_settings()
@@ -30,7 +29,6 @@ class RootPublicationHandler:
         enrichment_strict: bool = conf.publicator.enrichment_strict,
         enrichment_verbose_logging: bool = conf.publicator.enrichment_verbose_logging,
         card_data_enricher: CardDataEnricher | None = None,
-        ras_linked_violation_enricher: RasLinkedViolationEnricher | None = None,
         enable_s3_content_storage: bool | None = None,
     ):
 
@@ -40,7 +38,6 @@ class RootPublicationHandler:
         self.s3 = None
         self.opfab = None
         self.card_data_enricher = card_data_enricher
-        self.ras_linked_violation_enricher = ras_linked_violation_enricher
         self.enable_s3_content_storage = (
             conf.publicator.enable_s3_content_storage
             if enable_s3_content_storage is None
@@ -64,14 +61,6 @@ class RootPublicationHandler:
             self.opfab = opfab.AuthenticatedSession()
         except Exception as e:
             logger.error(f"Failed to initialize OperatorFabric service: {e}")
-
-        if self.ras_linked_violation_enricher is None and self.opfab is not None:
-            sar_config = builders.config["sar"]
-            self.ras_linked_violation_enricher = RasLinkedViolationEnricher(
-                self.opfab,
-                sar_process=sar_config["process"],
-                sar_state=sar_config["state"],
-            )
 
         if self.enable_s3_content_storage:
             try:
@@ -121,15 +110,6 @@ class RootPublicationHandler:
         if self.card_data_enricher is None:
             raise RuntimeError("Card enrichment service is not available")
         self.card_data_enricher.enrich_in_place(payload=card.data, card_fields=card_fields)
-
-        # A RAS references the contingency whose violated elements were already
-        # published in an earlier SAR card. Link those results before the final
-        # one-RA card recipients are derived.
-        if message_type.lower() == "ras" and self.ras_linked_violation_enricher:
-            self.ras_linked_violation_enricher.enrich_in_place(
-                card.data,
-                sar_card_id=headers.get("sar-card-id"),
-            )
 
         # RAS recipients depend on the operator resolved during enrichment.
         # Post-enrichment routing also enforces the one-schedule-per-card contract.
@@ -190,13 +170,13 @@ if __name__ == "__main__":
     TEST_MODE = "BUILD"  # BUILD or PREBUILT
     TEST_PROFILE = "RAS"  # SAR or RAS, used in BUILD mode
     TEST_PUBLISH = True  # Set False to build/save locally without calling OperatorFabric
-    TEST_SAR_CARD_ID = None  # Optional: "crosa.<processInstanceId>"
 
     project_root = Path(__file__).parent.parent
     NC_INPUT_PATHS = {
         "SAR": project_root / "tests" / "kevin" / "xml" / "SAR_EXCO_test.xml",
         # "RAS": project_root / "tests" / "kevin" / "xml" / "ras1D_test.xml",
-        "RAS": project_root / "tests" / "kevin" / "xml" / "RAS_EXCO.xml",
+        # "RAS": project_root / "tests" / "kevin" / "xml" / "RAS_1D_2130.xml",
+        "RAS": project_root / "tests" / "kevin" / "xml" / "RAS_1D_07-10.xml",
 
     }
     prebuilt_card_path = (
@@ -229,8 +209,6 @@ if __name__ == "__main__":
             "time-horizon": "1D",
             "version": "1",
         }
-        if TEST_SAR_CARD_ID:
-            headers["sar-card-id"] = TEST_SAR_CARD_ID
         properties = BasicProperties(
             content_type="application/octet-stream",
             delivery_mode=2,
