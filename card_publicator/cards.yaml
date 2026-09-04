@@ -1,5 +1,6 @@
 
 sar:
+  publisherType: "ENTITY"
   processVersion: "1"
   process: "crosa"
   state: "sar"
@@ -15,9 +16,8 @@ ras:
   severity: "ACTION"
   title: {"key": "ra_coordination.title"}
   summary: {"key": "ra_coordination.summary"}
-  entityRecipients: [
-    "ENTITY1_FR",
-    "38X-BALTIC-RSC-H"]
-  entitiesAllowedToRespond: [
-    "ENTITY1_FR",
-    "38X-BALTIC-RSC-H"]
+  publisherType: "ENTITY"
+  actions: ["KEEP_CHILD_CARDS"]
+  data:
+    step: "RCC RA PROPOSAL"
+    question: "Do you approve the following proposed remedial action?"

@@ -216,3 +216,7 @@ elering-ca.crt
 
 # Local tooling
 .claude/
+# Kevin
+
+tests/kevin
+*tar.gz
