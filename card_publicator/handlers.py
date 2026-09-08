@@ -1,5 +1,6 @@
 import json
 import uuid
+from datetime import UTC, datetime
 from io import BytesIO
 from pathlib import Path
 
@@ -10,10 +11,60 @@ from integrations import elastic, opfab, s3_storage
 from loguru import logger
 import settings
 from enrichment import CardDataEnricher
-from ras_linked_violations import RasLinkedViolationEnricher
 
 
 conf = settings.get_settings()
+
+
+def _format_feed_time(value: object) -> str:
+    """Format a converted UTC timestamp for the card-feed summary."""
+
+    if not value:
+        return "unknown period"
+    parsed = value if isinstance(value, datetime) else datetime.fromisoformat(
+        str(value).replace("Z", "+00:00")
+    )
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone(UTC)
+    return parsed.strftime("%d %b %H:%M UTC")
+
+
+def _full_model_of(card_data: object) -> dict:
+    """Return a converted message's FullModel header as a dict, if present."""
+
+    full_model = card_data.get("FullModel", {}) if isinstance(card_data, dict) else {}
+    if isinstance(full_model, list):
+        full_model = full_model[0] if full_model else {}
+    return full_model if isinstance(full_model, dict) else {}
+
+
+def _parse_was_generated_by(full_model: dict) -> tuple[str, str]:
+    """Split FullModel.wasGeneratedBy (e.g. 'CSA-1D-00-RAS') into (time_horizon, run_id)."""
+
+    parts = str(full_model.get("wasGeneratedBy", "")).split("-")
+    time_horizon = parts[1] if len(parts) >= 2 else ""
+    run_id = parts[2] if len(parts) >= 3 else ""
+    return time_horizon, run_id
+
+
+def _add_feed_process_parameters(card: object, headers: dict) -> None:
+    """Add the process cycle and business period to title/summary i18n data."""
+
+    full_model = _full_model_of(card.data)
+
+    # Rabbit headers are preferred, while FullModel.wasGeneratedBy keeps the
+    # feed label available when the transport metadata is incomplete.
+    generated_time_horizon, generated_run_id = _parse_was_generated_by(full_model)
+    time_horizon = str(headers.get("time-horizon") or "").upper() or generated_time_horizon.upper()
+    run_id = str(headers.get("run-id") or "") or generated_run_id
+    cycle = f"{time_horizon or 'unknown'}-{run_id or '--'}"
+
+    start = full_model.get("startDate") or full_model.get("scenarioTime")
+    end = full_model.get("endDate") or getattr(card, "endDate", None)
+    period = f"{_format_feed_time(start)} – {_format_feed_time(end)}"
+    parameters = {"cycle": cycle, "period": period}
+    card.title = {**card.title, "parameters": parameters}
+    card.summary = {**card.summary, "parameters": parameters}
 
 
 class RootPublicationHandler:
@@ -30,7 +81,6 @@ class RootPublicationHandler:
         enrichment_strict: bool = conf.publicator.enrichment_strict,
         enrichment_verbose_logging: bool = conf.publicator.enrichment_verbose_logging,
         card_data_enricher: CardDataEnricher | None = None,
-        ras_linked_violation_enricher: RasLinkedViolationEnricher | None = None,
         enable_s3_content_storage: bool | None = None,
     ):
 
@@ -40,7 +90,6 @@ class RootPublicationHandler:
         self.s3 = None
         self.opfab = None
         self.card_data_enricher = card_data_enricher
-        self.ras_linked_violation_enricher = ras_linked_violation_enricher
         self.enable_s3_content_storage = (
             conf.publicator.enable_s3_content_storage
             if enable_s3_content_storage is None
@@ -64,14 +113,6 @@ class RootPublicationHandler:
             self.opfab = opfab.AuthenticatedSession()
         except Exception as e:
             logger.error(f"Failed to initialize OperatorFabric service: {e}")
-
-        if self.ras_linked_violation_enricher is None and self.opfab is not None:
-            sar_config = builders.config["sar"]
-            self.ras_linked_violation_enricher = RasLinkedViolationEnricher(
-                self.opfab,
-                sar_process=sar_config["process"],
-                sar_state=sar_config["state"],
-            )
 
         if self.enable_s3_content_storage:
             try:
@@ -122,14 +163,9 @@ class RootPublicationHandler:
             raise RuntimeError("Card enrichment service is not available")
         self.card_data_enricher.enrich_in_place(payload=card.data, card_fields=card_fields)
 
-        # A RAS references the contingency whose violated elements were already
-        # published in an earlier SAR card. Link those results before the final
-        # one-RA card recipients are derived.
-        if message_type.lower() == "ras" and self.ras_linked_violation_enricher:
-            self.ras_linked_violation_enricher.enrich_in_place(
-                card.data,
-                sar_card_id=headers.get("sar-card-id"),
-            )
+        # The feed uses title/summary, while the Handlebars template controls
+        # only the opened card detail.
+        _add_feed_process_parameters(card, headers)
 
         # RAS recipients depend on the operator resolved during enrichment.
         # Post-enrichment routing also enforces the one-schedule-per-card contract.
@@ -188,15 +224,16 @@ class RootPublicationHandler:
 if __name__ == "__main__":
     # Local development/test harness only. 
     TEST_MODE = "BUILD"  # BUILD or PREBUILT
-    TEST_PROFILE = "RAS"  # SAR or RAS, used in BUILD mode
+    TEST_PROFILE = "SAR"  # SAR or RAS, used in BUILD mode
     TEST_PUBLISH = True  # Set False to build/save locally without calling OperatorFabric
-    TEST_SAR_CARD_ID = None  # Optional: "crosa.<processInstanceId>"
 
     project_root = Path(__file__).parent.parent
     NC_INPUT_PATHS = {
-        "SAR": project_root / "tests" / "kevin" / "xml" / "SAR_EXCO_test.xml",
+        # "SAR": project_root / "tests" / "kevin" / "xml" / "SAR_EXCO_test.xml",
+        "SAR": project_root / "tests" / "kevin" / "xml" / "SAR_20260520T1130_ID_1.xml",
         # "RAS": project_root / "tests" / "kevin" / "xml" / "ras1D_test.xml",
-        "RAS": project_root / "tests" / "kevin" / "xml" / "RAS_EXCO.xml",
+        # "RAS": project_root / "tests" / "kevin" / "xml" / "RAS_1D_2130.xml",
+        "RAS": project_root / "tests" / "kevin" / "xml" / "RAS_1D_07-10.xml",
 
     }
     prebuilt_card_path = (
@@ -217,20 +254,36 @@ if __name__ == "__main__":
         except KeyError as error:
             raise ValueError(f"Unsupported TEST_PROFILE: {TEST_PROFILE}") from error
 
+        with nc_input_path.open("rb") as file:
+            file_bytes = file.read()
+
+        # Read the metadata a real RabbitMQ header would carry from the
+        # fixture's own FullModel, instead of assuming fixed values that go
+        # stale the moment a different XML file is selected above.
+        from rdf_converter import convert_cim_rdf_to_json
+
+        full_model = _full_model_of(
+            convert_cim_rdf_to_json(file_bytes, root_class=[], key_mode="local")
+        )
+        time_horizon, run_id = _parse_was_generated_by(full_model)
+        time_horizon = time_horizon or "1D"
+        run_id = run_id or "00"
+        scenario_time = (
+            full_model.get("startDate")
+            or full_model.get("scenarioTime")
+            or datetime.now(UTC).isoformat()
+        )
+
         headers = {
             "message-id": str(uuid.uuid4()),
             "message-type": TEST_PROFILE,
             "project-name": "RMM_X",
-            "run-id": "00",
+            "run-id": run_id,
             "source-module": "CROSA",
-            # Local RabbitMQ metadata used for the top-level card date. Linked
-            # SAR lookup derives hourly midpoints from the RAS XML interval.
-            "scenario-time": "2026-08-13T01:30:00+00:00",
-            "time-horizon": "1D",
+            "scenario-time": scenario_time,
+            "time-horizon": time_horizon,
             "version": "1",
         }
-        if TEST_SAR_CARD_ID:
-            headers["sar-card-id"] = TEST_SAR_CARD_ID
         properties = BasicProperties(
             content_type="application/octet-stream",
             delivery_mode=2,
@@ -239,8 +292,6 @@ if __name__ == "__main__":
             timestamp=1747208205,
             headers=headers,
         )
-        with nc_input_path.open("rb") as file:
-            file_bytes = file.read()
 
         card = service.build_card(
             message=file_bytes,
