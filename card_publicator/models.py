@@ -24,8 +24,9 @@ class Card(BaseModel):
     state: str
     severity: Literal["INFORMATION", "ALARM", "ACTION", "COMPLIANT"] = "INFORMATION"
     startDate: datetime
-    title: Dict[str, str]
-    summary: Dict[str, str]
+    # I18n fields may contain a parameters map for dynamic feed text.
+    title: Dict[str, Any]
+    summary: Dict[str, Any]
 
     # Native OperatorFabric routing and response fields.
     groupRecipients: Optional[List[str]] = None

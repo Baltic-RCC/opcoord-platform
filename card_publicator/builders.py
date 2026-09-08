@@ -66,6 +66,19 @@ class RasProfileCardBuilder:
         # Keep static RAS presentation fields beside the native converted data.
         ras_data = {**config["ras"].get("data", {}), **converted}
 
+        # OpFab's native date range must reflect the RAS schedule's own
+        # activation window, not the enclosing message's scenario-time header.
+        # Source start and end from the same place (FullModel) so they can
+        # never disagree with each other or with the summary's {{period}}.
+        full_model = converted.get("FullModel", {})
+        if isinstance(full_model, list):
+            full_model = full_model[0] if full_model else {}
+        if isinstance(full_model, dict):
+            if full_model.get("startDate"):
+                card_fields["startDate"] = full_model["startDate"]
+            if full_model.get("endDate"):
+                card_fields["endDate"] = full_model["endDate"]
+
         # Build card using config, runtime fields, and converted data.
         ras_config = {**card_fields, **config["ras"], "data": ras_data}
         card = Card(**ras_config)
