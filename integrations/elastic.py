@@ -174,9 +174,10 @@ class Elastic:
     def update_document(self, index: str, id: str, body: dict):
         return self.client.update(index=index, id=id, body={'doc': body})
 
-    def get_docs_by_query(self, index: str, query: dict, size: int | None = None, return_df: bool = True):
+    def get_docs_by_query(self, index: str, query: dict, size: int | None = None, return_df: bool = True,
+                          sort: list | None = None):
 
-        response = self.client.search(index=index, query=query, size=size)
+        response = self.client.search(index=index, query=query, size=size, sort=sort)
         if self.debug:
             logger.info(f"Returned total {response['hits']['total']['value']} document")
         response = response['hits']['hits']
