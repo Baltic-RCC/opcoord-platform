@@ -31,3 +31,10 @@ url = "https://artifactory.elering.sise/artifactory/api/pypi/pssepip/simple"
 
 [tool.uv]
 allow-insecure-host = ["artifactory.elering.sise"]
+
+[dependency-groups]
+docs = [
+    "mkdocs>=1.6,<2",
+    "mkdocs-material>=9.7.7",
+    "mkdocstrings[python]>=1.0.6",
+]
