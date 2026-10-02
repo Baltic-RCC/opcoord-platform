@@ -10,7 +10,7 @@ outside OpFab.
 
 ## Processing
 
-[`RootRetrievingHandler.handle`](../reference/card-retriever.md#card_retriever.handlers.RootRetrievingHandler.handle)
+[`RootRetrievingHandler.handle`](../reference/card_retriever/handlers.md#card_retriever.handlers.RootRetrievingHandler.handle)
 parses the message body as card JSON and indexes it with the card's `cardId`
 as the document id. A card that is sent again therefore overwrites its earlier
 document instead of creating a duplicate.

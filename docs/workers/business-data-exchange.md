@@ -13,7 +13,7 @@ check and before the day-ahead (1D) CROSA run.
 
 ## Processing steps
 
-[`BusinessDataExchangeHandler.handle`](../reference/business-data-exchange.md#business_data_exchange.handlers.BusinessDataExchangeHandler.handle)
+[`BusinessDataExchangeHandler.handle`](../reference/business_data_exchange/handlers.md#business_data_exchange.handlers.BusinessDataExchangeHandler.handle)
 runs these steps:
 
 1. **Query.** For each dataset, fetch the documents whose `FullModel` validity

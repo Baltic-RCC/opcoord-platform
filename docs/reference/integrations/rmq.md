@@ -1,0 +1,3 @@
+# rmq
+
+::: integrations.rmq

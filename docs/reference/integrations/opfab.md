@@ -1,0 +1,3 @@
+# opfab
+
+::: integrations.opfab
