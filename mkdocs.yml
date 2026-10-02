@@ -1,0 +1,74 @@
+site_name: opcoord-platform
+site_description: Workers that turn CSA NC messages into OperatorFabric cards for the Baltic RCC coordination tool
+repo_url: https://github.com/Baltic-RCC/opcoord-platform
+repo_name: Baltic-RCC/opcoord-platform
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - search.suggest
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+validation:
+  anchors: warn
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [.]
+          options:
+            show_source: true
+            show_root_heading: true
+            show_if_no_docstring: true
+            members_order: source
+            filters: ["!^_[^_]"]
+            docstring_style: google
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+nav:
+  - Home: index.md
+  - Architecture: architecture.md
+  - Workers:
+      - Card publicator: workers/card-publicator.md
+      - Card retriever: workers/card-retriever.md
+      - Business data exchange: workers/business-data-exchange.md
+  - Configuration: configuration.md
+  - Development: development.md
+  - API reference:
+      - Card publicator: reference/card-publicator.md
+      - Card retriever: reference/card-retriever.md
+      - Business data exchange: reference/business-data-exchange.md
+      - Integrations: reference/integrations.md
+      - Config: reference/config.md
