@@ -27,7 +27,7 @@ The message body is the NC RDF/XML document. These AMQP headers are read:
 
 ## Processing steps
 
-[`RootPublicationHandler.handle`](../reference/card-publicator.md#card_publicator.handlers.RootPublicationHandler.handle)
+[`RootPublicationHandler.handle`](../reference/card_publicator/handlers.md#card_publicator.handlers.RootPublicationHandler.handle)
 runs these steps:
 
 1. **Build.** `CardFactory` picks the SAR or RAS builder. The builder converts the

@@ -26,7 +26,7 @@ Every worker has the same layout:
 | `handlers.py` | The business logic. The consumer calls the handler's `handle(message, properties)` for every message. |
 | `settings.py` | Pydantic settings read from environment variables. See [Configuration](configuration.md). |
 
-The two consumers use [`integrations.rmq.RMQConsumer`](reference/integrations.md).
+The two consumers use [`integrations.rmq.RMQConsumer`](reference/integrations/rmq.md#integrations.rmq.RMQConsumer).
 It runs each message on a thread pool with a prefetch of 1, acknowledges
 it when every handler succeeds, and **rejects it without requeueing** when a
 handler raises. A failed message is therefore dropped (or dead-lettered, if
@@ -39,15 +39,15 @@ most "why does the card look like this" questions.
 
 **1. Publish time**, in the card publicator. The result is frozen into the card:
 
-1. [`builders.py`](reference/card-publicator.md#card_publicator.builders) converts
+1. [`builders.py`](reference/card_publicator/builders.md) converts
    the NC RDF/XML to JSON with `rdf_converter.py` and applies the static
    fields for the profile from `card_publicator/cards.yaml` (process, state,
    severity, i18n keys, recipients).
-2. [`enrichment.py`](reference/card-publicator.md#card_publicator.enrichment)
+2. [`enrichment.py`](reference/card_publicator/enrichment.md)
    adds reference data from Elasticsearch: area and party names, contingency
    and remedial action names and operators, and for RAS the linked loading
    violations.
-3. [`handlers.py`](reference/card-publicator.md#card_publicator.handlers) sets the
+3. [`handlers.py`](reference/card_publicator/handlers.md) sets the
    `cycle` and `period` parameters on `title` and `summary`, applies RAS routing,
    and posts the card.
 
