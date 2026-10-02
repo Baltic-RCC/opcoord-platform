@@ -1,4 +1,4 @@
-name: Build and publish dev images
+name: Build and publish snapshot images
 
 permissions:
   contents: read
@@ -46,7 +46,7 @@ jobs:
             TAG="${GITHUB_REF_NAME}"
           else
             # branch push: snap-<sha> (change to "${GITHUB_REF_NAME}" if you prefer)
-            TAG="dev-${{ env.DATE_TAG }}"
+            TAG="snap-${{ env.DATE_TAG }}"
           fi
 
           echo "IMAGE_TAG=$TAG" >> "$GITHUB_ENV"
