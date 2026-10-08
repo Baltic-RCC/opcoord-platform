@@ -655,6 +655,18 @@ wheels = [
 ]
 
 [[package]]
+name = "mkdocs-panzoom-plugin"
+version = "0.5.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "mkdocs" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/51/03/0b75bf29b609daa544e852c3efee93181702ca68e46394895f61bd86f572/mkdocs_panzoom_plugin-0.5.2.tar.gz", hash = "sha256:f546356f5241fe5d499600be02a28cfe7d039c6f731d43f50eb6370065be2d3c", size = 22841, upload-time = "2025-12-22T15:46:58.929Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3d/58/370541865a451fc9e06f74d407f6d99581224455b5ffe5f55504a43ba6e4/mkdocs_panzoom_plugin-0.5.2-py3-none-any.whl", hash = "sha256:58746d7f7b8aef8787543a75b7a5ddcd04b67cfd6af964f25bbd9bc822ced68a", size = 22952, upload-time = "2025-12-22T15:46:57.123Z" },
+]
+
+[[package]]
 name = "mkdocstrings"
 version = "1.0.6"
 source = { registry = "https://pypi.org/simple" }
@@ -793,6 +805,7 @@ dependencies = [
 docs = [
     { name = "mkdocs" },
     { name = "mkdocs-material" },
+    { name = "mkdocs-panzoom-plugin" },
     { name = "mkdocstrings", extra = ["python"] },
     { name = "ruff" },
 ]
@@ -818,6 +831,7 @@ requires-dist = [
 docs = [
     { name = "mkdocs", specifier = ">=1.6,<2" },
     { name = "mkdocs-material", specifier = ">=9.7.7" },
+    { name = "mkdocs-panzoom-plugin", specifier = ">=0.5.2" },
     { name = "mkdocstrings", extras = ["python"], specifier = ">=1.0.6" },
     { name = "ruff", specifier = ">=0.16.10" },
 ]

@@ -4,14 +4,12 @@
 
 ```mermaid
 flowchart LR
-    CSA[CSA processes] -- "SAR / RAS NC messages" --> RMQ[(RabbitMQ)]
-    RMQ -- "opcoord.cards.publish" --> PUB[Card publicator]
-    PUB -- "reference data" --- ES[(Elasticsearch)]
-    PUB -- "POST card" --> OPFAB[OperatorFabric]
+    CSA[CSA processes] -- "SAR / RAS NC messages<br/>RabbitMQ: opcoord.cards.publish" --> PUB[Card publicator]
+    ES[(Elasticsearch)] -- "reference data" --> PUB
     PUB -- "card JSON" --> S3[(MinIO / S3)]
-    OPFAB -- "card events" --> RMQ2[(RabbitMQ)]
-    RMQ2 -- "opcoord.cards.retrieve.elastic-storage" --> RET[Card retriever]
-    RET --> ES
+    PUB -- "POST card" --> OPFAB[OperatorFabric]
+    OPFAB -- "card events<br/>RabbitMQ: opcoord.cards.retrieve.elastic-storage" --> RET[Card retriever]
+    RET -- "stores cards" --> ES
     ES -- "CSA input indices" --> BDE[Business data exchange]
     BDE -- "business data" --> OPFAB
 ```
