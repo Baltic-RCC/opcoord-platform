@@ -30,8 +30,13 @@ theme:
 validation:
   anchors: warn
 
+extra_css:
+  - stylesheets/extra.css
+
 plugins:
   - search
+  - panzoom:
+      full_screen: true
   - mkdocstrings:
       handlers:
         python:
@@ -75,6 +80,9 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Architecture: architecture.md
+  - Processes:
+      - SAR: processes/sar.md
+      - RAS: processes/ras.md
   - Workers:
       - Card publicator: workers/card-publicator.md
       - Card retriever: workers/card-retriever.md

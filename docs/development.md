@@ -60,5 +60,10 @@ uv run --group docs mkdocs build --strict # what CI runs
 - The API reference pages are generated from docstrings by
   [mkdocstrings](https://mkdocstrings.github.io/). A `::: module.name` line in
   a page renders that module. Docstrings use the Google style.
+- Mermaid diagrams get zoom and pan controls from
+  [mkdocs-panzoom-plugin](https://github.com/PLAYG0N/mkdocs-panzoom).
+- Add docs tools with `uv add --group docs <package>` and commit
+  `pyproject.toml` and `uv.lock` together. Do not install packages into
+  `.venv` by hand; `uv sync` removes them and CI never sees them.
 - Do not put internal hostnames, credentials or secret paths in the docs;
   this repository and its site are public.

@@ -36,6 +36,7 @@ allow-insecure-host = ["artifactory.elering.sise"]
 docs = [
     "mkdocs>=1.6,<2",
     "mkdocs-material>=9.7.7",
+    "mkdocs-panzoom-plugin>=0.5.2",
     "mkdocstrings[python]>=1.0.6",
     "ruff>=0.16.10",
 ]
