@@ -2,6 +2,7 @@ name: Build and publish snapshot images
 
 permissions:
   contents: read
+  security-events: write
 
 on:
   push:
@@ -52,34 +53,58 @@ jobs:
           echo "IMAGE_TAG=$TAG" >> "$GITHUB_ENV"
           echo "Computed IMAGE_TAG=$TAG with base image tag=${{ env.BASE_IMAGE_TAG }}"
 
-      - uses: docker/login-action@v3
-        with:
-          username: ${{ vars.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
       - uses: docker/build-push-action@v5
         with:
           context: .
           file: card_publicator/Dockerfile
-          push: true
+          load: true
           tags: |
             ${{ vars.DOCKER_USERNAME }}/${{ env.PUBLICATOR }}:${{ env.IMAGE_TAG }}
             ${{ vars.DOCKER_USERNAME }}/${{ env.PUBLICATOR }}:${{ env.LATEST_TAG }}
+
+      - name: Scan card-publicator image
+        uses: ./.github/actions/trivy-scan
+        with:
+          image-ref: ${{ vars.DOCKER_USERNAME }}/${{ env.PUBLICATOR }}:${{ env.IMAGE_TAG }}
+          category: trivy-card-publicator
 
       - uses: docker/build-push-action@v5
         with:
           context: .
           file: card_retriever/Dockerfile
-          push: true
+          load: true
           tags: |
             ${{ vars.DOCKER_USERNAME }}/${{ env.RETRIEVER }}:${{ env.IMAGE_TAG }}
             ${{ vars.DOCKER_USERNAME }}/${{ env.RETRIEVER }}:${{ env.LATEST_TAG }}
+
+      - name: Scan card-retriever image
+        uses: ./.github/actions/trivy-scan
+        with:
+          image-ref: ${{ vars.DOCKER_USERNAME }}/${{ env.RETRIEVER }}:${{ env.IMAGE_TAG }}
+          category: trivy-card-retriever
 
       - uses: docker/build-push-action@v5
         with:
           context: .
           file: business_data_exchange/Dockerfile
-          push: true
+          load: true
           tags: |
             ${{ vars.DOCKER_USERNAME }}/${{ env.EXCHANGE }}:${{ env.IMAGE_TAG }}
             ${{ vars.DOCKER_USERNAME }}/${{ env.EXCHANGE }}:${{ env.LATEST_TAG }}
+
+      - name: Scan business-data-exchange image
+        uses: ./.github/actions/trivy-scan
+        with:
+          image-ref: ${{ vars.DOCKER_USERNAME }}/${{ env.EXCHANGE }}:${{ env.IMAGE_TAG }}
+          category: trivy-business-data-exchange
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Push images
+        run: |
+          docker push --all-tags ${{ vars.DOCKER_USERNAME }}/${{ env.PUBLICATOR }}
+          docker push --all-tags ${{ vars.DOCKER_USERNAME }}/${{ env.RETRIEVER }}
+          docker push --all-tags ${{ vars.DOCKER_USERNAME }}/${{ env.EXCHANGE }}
