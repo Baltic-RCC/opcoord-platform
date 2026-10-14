@@ -31,3 +31,13 @@ url = "https://artifactory.elering.sise/artifactory/api/pypi/pssepip/simple"
 
 [tool.uv]
 allow-insecure-host = ["artifactory.elering.sise"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "--import-mode=importlib"
