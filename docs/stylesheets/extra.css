@@ -1,0 +1,15 @@
+/* Use the full browser width instead of Material's default 61rem cap, so
+   wide tables and Mermaid diagrams get more room. */
+.md-grid {
+  max-width: initial;
+}
+
+/* Mermaid in dark mode: Material's defaults are low-contrast on the slate
+   background, so use the regular text colours for labels and edges. */
+[data-md-color-scheme="slate"] {
+  --md-mermaid-node-fg-color: #9aa5f0;
+  --md-mermaid-node-bg-color: #9aa5f01f;
+  --md-mermaid-edge-color: var(--md-default-fg-color--light);
+  --md-mermaid-label-fg-color: var(--md-default-fg-color);
+  --md-mermaid-label-bg-color: var(--md-default-bg-color);
+}
