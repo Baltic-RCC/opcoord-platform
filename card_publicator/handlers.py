@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from io import BytesIO
 from pathlib import Path
 
+import pytz
 from pika import BasicProperties
 
 import builders
@@ -16,17 +17,28 @@ from enrichment import CardDataEnricher
 conf = settings.get_settings()
 
 
-def _format_feed_time(value: object) -> str:
-    """Format a converted UTC timestamp for the card-feed summary."""
+# Feed summaries show the business period in Central European time, the
+# zone the CSA process runs in, whatever the viewer's browser zone is.
+FEED_TIME_ZONE = pytz.timezone("Europe/Berlin")
+
+
+def _to_feed_time(value: object) -> datetime | None:
+    """Convert a converted UTC timestamp to Central European time."""
 
     if not value:
-        return "unknown period"
+        return None
     parsed = value if isinstance(value, datetime) else datetime.fromisoformat(
         str(value).replace("Z", "+00:00")
     )
-    if parsed.tzinfo is not None:
-        parsed = parsed.astimezone(UTC)
-    return parsed.strftime("%d %b %H:%M UTC")
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(FEED_TIME_ZONE)
+
+
+def _format_feed_time(value: datetime | None) -> str:
+    """Format a feed timestamp as 'YYYY-MM-DD HH:MM'."""
+
+    return value.strftime("%Y-%m-%d %H:%M") if value else "unknown"
 
 
 def _full_model_of(card_data: object) -> dict:
@@ -48,7 +60,13 @@ def _parse_was_generated_by(full_model: dict) -> tuple[str, str]:
 
 
 def _add_feed_process_parameters(card: object, headers: dict) -> None:
-    """Add the process cycle and business period to title/summary i18n data."""
+    """Add the process run and business period to title/summary i18n data.
+
+    Every bundle uses the same feed pattern, with the fixed parts written in
+    its i18n.json:
+      title:   {task} | {process} | {card_type} | {{timeHorizon}} - {{runId}}
+      summary: {{start}} - {{end}} {{zone}}
+    """
 
     full_model = _full_model_of(card.data)
 
@@ -57,14 +75,25 @@ def _add_feed_process_parameters(card: object, headers: dict) -> None:
     generated_time_horizon, generated_run_id = _parse_was_generated_by(full_model)
     time_horizon = str(headers.get("time-horizon") or "").upper() or generated_time_horizon.upper()
     run_id = str(headers.get("run-id") or "") or generated_run_id
-    cycle = f"{time_horizon or 'unknown'}-{run_id or '--'}"
 
-    start = full_model.get("startDate") or full_model.get("scenarioTime")
-    end = full_model.get("endDate") or getattr(card, "endDate", None)
-    period = f"{_format_feed_time(start)} – {_format_feed_time(end)}"
-    parameters = {"cycle": cycle, "period": period}
-    card.title = {**card.title, "parameters": parameters}
-    card.summary = {**card.summary, "parameters": parameters}
+    start = _to_feed_time(full_model.get("startDate") or full_model.get("scenarioTime"))
+    end = _to_feed_time(full_model.get("endDate") or getattr(card, "endDate", None))
+    # CET or CEST, taken from the start (a period crossing the DST change
+    # keeps the zone of its start).
+    zone = (start or end).tzname() if (start or end) else "CET"
+
+    card.title = {
+        **card.title,
+        "parameters": {"timeHorizon": time_horizon or "unknown", "runId": run_id or "--"},
+    }
+    card.summary = {
+        **card.summary,
+        "parameters": {
+            "start": _format_feed_time(start),
+            "end": _format_feed_time(end),
+            "zone": zone,
+        },
+    }
 
 
 class RootPublicationHandler:
@@ -223,8 +252,8 @@ class RootPublicationHandler:
 
 if __name__ == "__main__":
     # Local development/test harness only. 
-    TEST_MODE = "BUILD"  # BUILD or PREBUILT
-    TEST_PROFILE = "SAR"  # SAR or RAS, used in BUILD mode
+    TEST_MODE = "PREBUILT"  # BUILD or PREBUILT
+    TEST_PROFILE = "RAS"  # SAR or RAS, used in BUILD mode
     TEST_PUBLISH = True  # Set False to build/save locally without calling OperatorFabric
 
     project_root = Path(__file__).parent.parent

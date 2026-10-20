@@ -46,7 +46,8 @@ most "why does the card look like this" questions.
    and remedial action names and operators, and for RAS the linked loading
    violations.
 3. [`handlers.py`](reference/card_publicator/handlers.md) sets the
-   `cycle` and `period` parameters on `title` and `summary`, applies RAS routing,
+   `timeHorizon`/`runId` parameters on `title` and `start`/`end`/`zone` on
+   `summary`, applies RAS routing,
    and posts the card.
 
 **2. Render time**, in the OpFab UI, on every display:
