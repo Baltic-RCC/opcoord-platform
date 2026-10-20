@@ -23,5 +23,4 @@ class Logging(BaseSettings):
 
 
 if __name__ == "__main__":
-    conf = Logging()
-    print(conf)
+    print(Logging())

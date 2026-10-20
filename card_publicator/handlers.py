@@ -250,27 +250,27 @@ class RootPublicationHandler:
         return self.publish_card(card_json)
 
 
-if __name__ == "__main__":
-    # Local development/test harness only. 
+def _run_local_harness() -> None:
+    """Build and/or publish one card locally, without RabbitMQ.
+
+    Local development only; the deployed worker uses handle(). Set the
+    TEST_* constants below to choose what to run.
+    """
     TEST_MODE = "PREBUILT"  # BUILD or PREBUILT
     TEST_PROFILE = "RAS"  # SAR or RAS, used in BUILD mode
     TEST_PUBLISH = True  # Set False to build/save locally without calling OperatorFabric
 
-    project_root = Path(__file__).parent.parent
+    # Local fixtures live in tests/local/ (gitignored): xml/ for NC inputs,
+    # payload/ for built cards.
+    local_dir = Path(__file__).parent.parent / "tests" / "local"
     NC_INPUT_PATHS = {
-        # "SAR": project_root / "tests" / "kevin" / "xml" / "SAR_EXCO_test.xml",
-        "SAR": project_root / "tests" / "kevin" / "xml" / "SAR_20260520T1130_ID_1.xml",
-        # "RAS": project_root / "tests" / "kevin" / "xml" / "ras1D_test.xml",
-        # "RAS": project_root / "tests" / "kevin" / "xml" / "RAS_1D_2130.xml",
-        "RAS": project_root / "tests" / "kevin" / "xml" / "RAS_1D_07-10.xml",
-
+        "SAR": local_dir / "xml" / "SAR_20260520T1130_ID_1.xml",
+        "RAS": local_dir / "xml" / "RAS_1D_07-10.xml",
     }
-    prebuilt_card_path = (
-        project_root / "tests" / "kevin" / "payload" / "ras_built.json"
-    )
+    prebuilt_card_path = local_dir / "payload" / "ras_built.json"
 
     save_built_card = True
-    built_card_output_dir = project_root / "tests" / "kevin" / "payload"
+    built_card_output_dir = local_dir / "payload"
     built_card_output_name = f"{TEST_PROFILE.lower()}_built.json"
 
     service = RootPublicationHandler(
@@ -346,3 +346,7 @@ if __name__ == "__main__":
             service.send_prebuilt_card(card_json)
     else:
         raise ValueError(f"Unsupported TEST_MODE: {TEST_MODE}")
+
+
+if __name__ == "__main__":
+    _run_local_harness()

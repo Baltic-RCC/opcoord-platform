@@ -34,8 +34,3 @@ class RootRetrievingHandler:
         logger.success(f"Message handling completed successfully")
 
         return message, properties
-
-
-if __name__ == '__main__':
-    pass
-

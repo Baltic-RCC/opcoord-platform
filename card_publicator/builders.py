@@ -99,11 +99,3 @@ class RasProfileCardBuilder:
         card.entityRecipients = [card.publisher, target_entity]
         card.entitiesAllowedToRespond = [target_entity]
         card.entitiesRequiredToRespond = [target_entity]
-
-if __name__ == '__main__':
-    # Testing
-    from datetime import datetime
-    import uuid
-    content_path = Path(__file__).parent.parent.joinpath("tests/data/nc_ras.xml")
-    card_field = {"startDate": datetime.now().isoformat(), "processInstanceId": str(uuid.uuid4()), "publisher": "lukas"}
-    response = SarProfileCardBuilder().build(content=content_path, card_fields=card_field)

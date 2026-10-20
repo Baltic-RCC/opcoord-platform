@@ -219,4 +219,5 @@ elering-ca.crt
 # Kevin
 
 tests/kevin
+tests/local
 *tar.gz

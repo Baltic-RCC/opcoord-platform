@@ -47,5 +47,4 @@ def get_settings() -> PublicatorConfig:
 
 
 if __name__ == "__main__":
-    conf = get_settings()
-    print(conf)
+    print(get_settings())
