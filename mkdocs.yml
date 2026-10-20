@@ -1,0 +1,114 @@
+site_name: opcoord-platform
+site_description: Workers that turn CSA NC messages into OperatorFabric cards for the Baltic RCC coordination tool
+repo_url: https://github.com/Baltic-RCC/opcoord-platform
+repo_name: Baltic-RCC/opcoord-platform
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  features:
+    - navigation.instant
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - search.suggest
+    - search.highlight
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+validation:
+  anchors: warn
+
+extra_css:
+  - stylesheets/extra.css
+
+plugins:
+  - search
+  - panzoom:
+      full_screen: true
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [.]
+          options:
+            docstring_style: google
+            docstring_section_style: table
+            show_source: true
+            show_if_no_docstring: true
+            show_root_heading: true
+            show_root_full_path: false
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            merge_init_into_class: true
+            separate_signature: true
+            show_signature_annotations: true
+            signature_crossrefs: true
+            members_order: source
+            filters: ["!^_"]
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.snippets:
+      base_path: [.]
+      check_paths: true
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+nav:
+  - Home: index.md
+  - Architecture: architecture.md
+  - Processes:
+      - SAR: processes/sar.md
+      - RAS: processes/ras.md
+  - Workers:
+      - Card publicator: workers/card-publicator.md
+      - Card retriever: workers/card-retriever.md
+      - Business data exchange: workers/business-data-exchange.md
+  - Configuration: configuration.md
+  - Development: development.md
+  - API reference:
+      - card_publicator:
+          - handlers: reference/card_publicator/handlers.md
+          - builders: reference/card_publicator/builders.md
+          - models: reference/card_publicator/models.md
+          - enrichment: reference/card_publicator/enrichment.md
+          - rdf_converter: reference/card_publicator/rdf_converter.md
+          - settings: reference/card_publicator/settings.md
+      - card_retriever:
+          - handlers: reference/card_retriever/handlers.md
+          - settings: reference/card_retriever/settings.md
+      - business_data_exchange:
+          - handlers: reference/business_data_exchange/handlers.md
+          - settings: reference/business_data_exchange/settings.md
+      - integrations:
+          - elastic: reference/integrations/elastic.md
+          - opfab: reference/integrations/opfab.md
+          - rmq: reference/integrations/rmq.md
+          - s3_storage: reference/integrations/s3_storage.md
+      - config:
+          - integrations: reference/config/integrations.md
+          - logging: reference/config/logging.md
+          - init_log_handlers: reference/config/init_log_handlers.md

@@ -1,16 +1,18 @@
 
 sar:
   publisherType: "ENTITY"
-  processVersion: "1"
+  processVersion: "2"
   process: "crosa"
   state: "sar"
   severity: "INFORMATION"
   title: {"key": "crosa.title"}
   summary: {"key": "crosa.summary"}
-  groupRecipients: ["ADMIN"]
+  # SAR results go to the RCC and every Baltic TSO (Elering, Litgrid, AST),
+  # so manual proposal cards can find them as the answering TSO.
+  entityRecipients: ["38X-BALTIC-RSC-H", "10X1001A1001A39W", "10X1001A1001A55Y", "10X1001A1001B54W"]
 
 ras:
-  processVersion: "1"
+  processVersion: "2"
   process: "ra_coordination"
   state: "proposed"
   severity: "ACTION"
