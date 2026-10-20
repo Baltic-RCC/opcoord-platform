@@ -342,14 +342,17 @@ def normalize_cim_payload(payload: dict, root_only: bool = True) -> pd.DataFrame
     return df
 
 
-if __name__ == "__main__":
-    # Testing
+def _demo() -> None:
+    """Convert the sample SAR fixture and print the JSON and flattened table."""
     rdf_xml = Path(__file__).parent.parent.joinpath("tests/data/nc_sar.xml")
-    result = convert_cim_rdf_to_json(rdf_xml, root_class=["BaseCasePowerFlowResult", "ContingencyPowerFlowResult"], key_mode="local")
-
+    result = convert_cim_rdf_to_json(
+        rdf_xml,
+        root_class=["BaseCasePowerFlowResult", "ContingencyPowerFlowResult"],
+        key_mode="local",
+    )
     print(json.dumps(result, indent=2))
+    print(normalize_cim_payload(payload=result, root_only=False).head())
 
-    with open("test.json", "w") as f:
-        json.dump(result, f, ensure_ascii=False, indent=4)
-    df = normalize_cim_payload(payload=result, root_only=False)
-    print(df.head())
+
+if __name__ == "__main__":
+    _demo()

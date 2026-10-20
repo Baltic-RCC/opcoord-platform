@@ -210,9 +210,5 @@ class S3Minio:
 
 
 if __name__ == '__main__':
-    # Test Minio API
-    service = S3Minio()
-    buckets = service.client.list_buckets()
-    objects = service.list_objects(bucket_name='analyses')
-    print(buckets)
-
+    # Smoke test: list the buckets the configured credentials can see.
+    print(S3Minio().client.list_buckets())

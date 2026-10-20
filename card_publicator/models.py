@@ -66,8 +66,3 @@ class Card(BaseModel):
             logger.warning("startDate is naive datetime, assuming UTC")
             v = v.replace(tzinfo=timezone.utc)
         return int(v.timestamp() * 1000)
-
-
-if __name__ == "__main__":
-    card = Card()
-    print(card)

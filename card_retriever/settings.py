@@ -39,5 +39,4 @@ def get_settings() -> RetrieverConfig:
 
 
 if __name__ == "__main__":
-    conf = get_settings()
-    print(conf)
+    print(get_settings())

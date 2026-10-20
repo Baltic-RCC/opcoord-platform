@@ -60,8 +60,11 @@ runs these steps:
 
 ## Local test harness
 
-Running `card_publicator/handlers.py` directly starts a local harness (the
-`if __name__ == "__main__"` block). It is not used by the deployed worker.
+Running `card_publicator/handlers.py` directly starts a local harness
+(`_run_local_harness`). It is not used by the deployed worker. It reads NC XML
+files from `tests/local/xml/` and reads and writes built cards in
+`tests/local/payload/`; `tests/local/` is gitignored, so local fixtures are
+never committed.
 
 - `TEST_MODE = "BUILD"` builds a card from a local NC XML file, faking the
   RabbitMQ headers from the file's `FullModel`, and can save the result as JSON.

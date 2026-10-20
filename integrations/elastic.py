@@ -231,25 +231,3 @@ class HandlerSendToElastic:
         logger.info(f"Message sending to Elastic successful: {response}")
 
         return message, properties
-
-
-if __name__ == '__main__':
-
-    # Create client
-    server = "access_url"
-    api_key = "acces_token"
-    service = Elastic(server=server, api_key=api_key, debug=True)
-
-    # Example get documents by query
-    # query = {"match": {"scenario_date": "2023-03-21"}}
-    # df = service.get_docs_by_query(index='csa-debug', size=200, query=query)
-
-    # Example send document
-    # json_message = {'user': 'testuser', 'message': None}
-    #
-    # try:
-    #     Elk.send_to_elastic(index="test", json_message=json_message, server=server, api_key=api_key, debug=True)
-    # except Exception as error:
-    #     print(f"Message sending failed with error {error}")
-    #     print(json_message)
-    #     raise error

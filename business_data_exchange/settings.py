@@ -103,5 +103,4 @@ def get_settings() -> ExchangeConfig:
 
 
 if __name__ == "__main__":
-    conf = get_settings()
-    print(conf)
+    print(get_settings())

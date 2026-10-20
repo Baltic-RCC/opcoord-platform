@@ -743,30 +743,3 @@ class ReconnectingConsumer:
 
     def stop(self):
         self._consumer.stop()
-
-
-if __name__ == '__main__':
-    # Testing RMQ API
-    host = 'access_url'
-    port = 5672
-    vhost = r'/'
-    queue = 'queue-name'
-    username = None
-    password = None
-
-    # Blocking client
-    client = BlockingClient()
-    method_frame, properties, body = client.get_single_message(queue=queue)
-
-    # Consumer
-    consumer = RMQConsumer(host=host,
-                           port=port,
-                           vhost=vhost,
-                           queue=queue,
-                           username=username,
-                           password=password,
-                           message_handlers=None)
-    try:
-        consumer.run()
-    except KeyboardInterrupt:
-        consumer.stop()

@@ -413,5 +413,4 @@ class BusinessDataExchangeHandler:
 
 
 if __name__ == "__main__":
-    handler = BusinessDataExchangeHandler(debug=True)
-    handler.handle()
+    BusinessDataExchangeHandler(debug=True).handle()
