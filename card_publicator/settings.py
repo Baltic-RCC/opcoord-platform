@@ -19,7 +19,7 @@ class BusinessSettings(BaseSettings):
                                       env_prefix="PUBLICATOR_",
                                       extra="ignore")
 
-    cards_index: str = "dev-opcoord-cards"
+    cards_index: str = "opcoord-cards"
     publisher: ClassVar[str] = "38X-BALTIC-RSC-H"
     enable_s3_content_storage: bool = True
     s3_bucket_name: str = "analyses"

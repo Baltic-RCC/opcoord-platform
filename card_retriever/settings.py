@@ -18,7 +18,7 @@ class BusinessSettings(BaseSettings):
                                       env_prefix="RETRIEVER_",
                                       extra="ignore")
 
-    cards_index: str = "dev-opcoord-cards"
+    cards_index: str = "opcoord-cards"
     debug: bool = False
 
 
